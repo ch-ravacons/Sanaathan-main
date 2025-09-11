@@ -9,12 +9,10 @@ export const PostFeed: React.FC = () => {
   const { user } = useAuth();
   const hasSupabase = Boolean(supabase);
   const [posts, setPosts] = useState<Post[]>(hasSupabase ? [] : samplePosts);
-  const [loading, setLoading] = useState(hasSupabase);
+  const [loading, setLoading] = useState<boolean>(hasSupabase);
 
   const interestsKey = user?.interests?.join(',') || '';
-
-  const userId = user?.id;
-n
+  const userId = user?.id ?? null;
 
   const fetchPosts = useCallback(async () => {
     try {
@@ -23,43 +21,44 @@ n
         return;
       }
 
-
+      // Base query: posts + joined user row
       let query = supabase
-
-      const { data, error }: any = await supabase
-
         .from('posts')
-        .select(`
+        .select(
+          `
           *,
           users(*)
-        `)
+        `
+        );
 
-        .order('created_at', { ascending: false })
-        .limit(20);
+      // Show approved posts to everyone; include my own posts even if not yet approved
+      if (userId) {
+        query = query.or(
+          `moderation_status.eq.approved,user_id.eq.${encodeURIComponent(userId)}`
+        );
+      } else {
+        query = query.eq('moderation_status', 'approved');
+      }
 
-      query = userId
-        ? query.or(`moderation_status.eq.approved,user_id.eq.${encodeURIComponent(userId)}`)
-        : query.eq('moderation_status', 'approved');
+      // Finalize ordering/paging
+      query = query.order('created_at', { ascending: false }).limit(20);
 
-      const { data, error }: any = await query;
-
-        .eq('moderation_status', 'approved')
-        .order('created_at', { ascending: false })
-        .limit(20);
-
+      const { data, error } = await query;
 
       if (error) throw error;
 
-      let transformedPosts = (data || []).map((post: any) => ({
+      // Map joined user object
+      let transformedPosts: Post[] = (data ?? []).map((post: any) => ({
         ...post,
-        user: post.users,
+        user: post.users, // keep your Post.user shape
       }));
 
+      // Optional interests-based prioritization
       if (interestsKey) {
-        const interestSet = new Set(interestsKey.split(','));
-        const preferred = transformedPosts.filter((p) => {
+        const interestSet = new Set(interestsKey.split(',').map((s) => s.trim()).filter(Boolean));
+        const preferred = transformedPosts.filter((p: any) => {
           const topicMatch = p.spiritual_topic && interestSet.has(p.spiritual_topic);
-          const tagMatch = (p.tags || []).some((t: string) => interestSet.has(t));
+          const tagMatch = Array.isArray(p.tags) && p.tags.some((t: string) => interestSet.has(t));
           return topicMatch || tagMatch;
         });
         const others = transformedPosts.filter((p) => !preferred.includes(p));
@@ -67,17 +66,13 @@ n
       }
 
       setPosts(transformedPosts.length ? transformedPosts : samplePosts);
-    } catch (error) {
-      console.error('Error fetching posts:', error);
+    } catch (err) {
+      console.error('Error fetching posts:', err);
       setPosts(samplePosts);
     } finally {
       setLoading(false);
     }
-
   }, [interestsKey, userId]);
-
-  
-
 
   useEffect(() => {
     if (!hasSupabase) return;
@@ -98,15 +93,15 @@ n
         {[1, 2, 3].map((i) => (
           <div key={i} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 animate-pulse">
             <div className="flex items-center space-x-3 mb-4">
-              <div className="w-10 h-10 bg-gray-300 rounded-full"></div>
+              <div className="w-10 h-10 bg-gray-300 rounded-full" />
               <div className="space-y-2">
-                <div className="h-4 bg-gray-300 rounded w-32"></div>
-                <div className="h-3 bg-gray-300 rounded w-24"></div>
+                <div className="h-4 bg-gray-300 rounded w-32" />
+                <div className="h-3 bg-gray-300 rounded w-24" />
               </div>
             </div>
             <div className="space-y-2">
-              <div className="h-4 bg-gray-300 rounded"></div>
-              <div className="h-4 bg-gray-300 rounded w-3/4"></div>
+              <div className="h-4 bg-gray-300 rounded" />
+              <div className="h-4 bg-gray-300 rounded w-3/4" />
             </div>
           </div>
         ))}
@@ -117,16 +112,12 @@ n
   return (
     <div>
       <CreatePost onPostCreated={handlePostCreated} />
-      
+
       <div className="space-y-4">
         {posts.map((post) => (
-          <PostCard
-            key={post.id}
-            post={post}
-            onUpdate={handlePostUpdate}
-          />
+          <PostCard key={post.id} post={post} onUpdate={handlePostUpdate} />
         ))}
-        
+
         {posts.length === 0 && (
           <div className="text-center py-12">
             <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -146,7 +137,8 @@ const samplePosts: Post[] = [
   {
     id: '1',
     user_id: 'sample1',
-    content: 'Just finished reading the Mandukya Upanishad. The four states of consciousness described are so profound. Om represents the entire cosmos and our journey through waking, dreaming, deep sleep, and the transcendent state. How has this teaching influenced your meditation practice?',
+    content:
+      'Just finished reading the Mandukya Upanishad. The four states of consciousness described are so profound. Om represents the entire cosmos and our journey through waking, dreaming, deep sleep, and the transcendent state. How has this teaching influenced your meditation practice?',
     spiritual_topic: 'upanishads',
     tags: ['meditation', 'consciousness', 'om'],
     likes_count: 24,
@@ -171,7 +163,8 @@ const samplePosts: Post[] = [
   {
     id: '2',
     user_id: 'sample2',
-    content: 'Beautiful Navaratri celebration at our local temple today. The divine feminine energy was so palpable during the Durga Puja. Feeling blessed to witness such devotion and community spirit. The chanting of the Devi Mahatmya filled my heart with joy. 🌺',
+    content:
+      'Beautiful Navaratri celebration at our local temple today. The divine feminine energy was so palpable during the Durga Puja. Feeling blessed to witness such devotion and community spirit. The chanting of the Devi Mahatmya filled my heart with joy. 🌺',
     spiritual_topic: 'festivals',
     tags: ['navaratri', 'durga', 'devotion'],
     likes_count: 45,
