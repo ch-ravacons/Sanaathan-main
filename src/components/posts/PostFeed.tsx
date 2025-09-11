@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { PostCard } from './PostCard';
 import { CreatePost } from './CreatePost';
 import { Post } from '../../types';
@@ -11,7 +11,9 @@ export const PostFeed: React.FC = () => {
   const [posts, setPosts] = useState<Post[]>(hasSupabase ? [] : samplePosts);
   const [loading, setLoading] = useState(hasSupabase);
 
-  const fetchPosts = async () => {
+  const interestsKey = user?.interests?.join(',') || '';
+
+  const fetchPosts = useCallback(async () => {
     try {
       if (!supabase) {
         setLoading(false);
@@ -48,10 +50,21 @@ export const PostFeed: React.FC = () => {
 
       if (error) throw error;
 
-      const transformedPosts = (data || []).map((post: any) => ({
+      let transformedPosts = (data || []).map((post: any) => ({
         ...post,
         user: post.users,
       }));
+
+      if (interestsKey) {
+        const interestSet = new Set(interestsKey.split(','));
+        const preferred = transformedPosts.filter((p) => {
+          const topicMatch = p.spiritual_topic && interestSet.has(p.spiritual_topic);
+          const tagMatch = (p.tags || []).some((t: string) => interestSet.has(t));
+          return topicMatch || tagMatch;
+        });
+        const others = transformedPosts.filter((p) => !preferred.includes(p));
+        transformedPosts = [...preferred, ...others];
+      }
 
       setPosts(transformedPosts.length ? transformedPosts : samplePosts);
     } catch (error) {
@@ -60,12 +73,12 @@ export const PostFeed: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [interestsKey]);
 
   useEffect(() => {
     if (!hasSupabase) return;
     fetchPosts();
-  }, [hasSupabase]);
+  }, [hasSupabase, fetchPosts]);
 
   const handlePostCreated = () => {
     fetchPosts();
