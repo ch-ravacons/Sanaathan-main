@@ -32,7 +32,11 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !content.trim()) return;
+    if (!content.trim()) return;
+    if (!user) {
+      alert('You must be signed in to create a post.');
+      return;
+    }
 
     const moderationResult = moderateContent(content);
 
@@ -40,9 +44,10 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
 
     try {
       const tagsArray = tags.split(',').map(tag => tag.trim()).filter(Boolean);
-      
+
       if (!supabase) {
         alert('Database connection not available. Please check your Supabase configuration.');
+        setLoading(false);
         return;
       }
 

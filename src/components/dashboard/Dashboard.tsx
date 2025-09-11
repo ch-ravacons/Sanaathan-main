@@ -1,20 +1,140 @@
-import React from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Header } from '../layout/Header';
 import { Welcome } from './Welcome';
 import { PostFeed } from '../posts/PostFeed';
 import { BookOpen, Users, Calendar, Heart } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
+import { User } from '../../types';
 
 interface DashboardProps {
   onNavigate: (page: 'dashboard' | 'profile') => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
+  const { user } = useAuth();
+  const hasSupabase = Boolean(supabase);
+
+  const [dailyReading, setDailyReading] = useState('Bhagavad Gita Chapter 4');
+  const [communityStats, setCommunityStats] = useState('0 members');
+  const [nextEvent, setNextEvent] = useState('No upcoming events');
+  const [devotionStats, setDevotionStats] = useState('Daily practice tracker');
+
+  const [trendingTopics, setTrendingTopics] = useState<{
+    topic: string;
+    count: number;
+  }[]>([
+    { topic: 'BhagavadGita', count: 2100 },
+    { topic: 'Meditation', count: 1800 },
+    { topic: 'Yoga', count: 1500 },
+    { topic: 'Diwali2024', count: 1200 },
+  ]);
+
+  const [suggestedConnections, setSuggestedConnections] = useState<
+    Pick<User, 'id' | 'full_name' | 'spiritual_path'>[]
+  >([
+    { id: '1', full_name: 'Ravi Shankar', spiritual_path: 'Yoga Teacher' },
+    { id: '2', full_name: 'Sita Devi', spiritual_path: 'Sanskrit Scholar' },
+  ]);
+
+  const fetchQuickStats = useCallback(async () => {
+    if (!supabase) return;
+    try {
+      const { count: userCount } = await supabase
+        .from('users')
+        .select('*', { count: 'exact', head: true });
+      if (typeof userCount === 'number') {
+        setCommunityStats(`${userCount} members`);
+      }
+
+      const { data: event } = await supabase
+        .from('events')
+        .select('title')
+        .gte('start_time', new Date().toISOString())
+        .order('start_time', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (event?.title) {
+        setNextEvent(event.title);
+      }
+    } catch (error) {
+      console.error('Error fetching quick stats:', error);
+    }
+  }, []);
+
+  const fetchTrending = useCallback(async () => {
+    if (!supabase) return;
+    try {
+      const { data, error } = await supabase.from('posts').select('tags');
+      if (error) throw error;
+      const counts: Record<string, number> = {};
+      (data || []).forEach((p: any) => {
+        (p.tags || []).forEach((tag: string) => {
+          counts[tag] = (counts[tag] || 0) + 1;
+        });
+      });
+      const topics = Object.entries(counts)
+        .map(([topic, count]) => ({ topic, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 4);
+      if (topics.length) {
+        setTrendingTopics(topics);
+      }
+    } catch (error) {
+      console.error('Error fetching trending topics:', error);
+    }
+  }, []);
+
+  const fetchSuggestions = useCallback(async () => {
+    if (!supabase || !user) return;
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, full_name, spiritual_path, interests')
+        .neq('id', user.id)
+        .limit(5);
+      if (error) throw error;
+      if (data) {
+        const userInterests = new Set(user.interests || []);
+        const sorted = data
+          .map((u: any) => u)
+          .sort((a: any, b: any) => {
+            const aMatches = (a.interests || []).filter((i: string) =>
+              userInterests.has(i)
+            ).length;
+            const bMatches = (b.interests || []).filter((i: string) =>
+              userInterests.has(i)
+            ).length;
+            return bMatches - aMatches;
+          })
+          .slice(0, 5)
+          .map((u: any) => ({
+            id: u.id,
+            full_name: u.full_name,
+            spiritual_path: u.spiritual_path,
+          }));
+        if (sorted.length) {
+          setSuggestedConnections(sorted);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching suggested connections:', error);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (hasSupabase) {
+      fetchQuickStats();
+      fetchTrending();
+      fetchSuggestions();
+    }
+  }, [hasSupabase, fetchQuickStats, fetchTrending, fetchSuggestions]);
 
   const quickActions = [
-    { icon: BookOpen, label: 'Daily Reading', description: 'Bhagavad Gita Chapter 4' },
-    { icon: Users, label: 'Community', description: '1.2k active members' },
-    { icon: Calendar, label: 'Events', description: 'Upcoming satsang' },
-    { icon: Heart, label: 'Devotion', description: 'Daily practice tracker' },
+    { icon: BookOpen, label: 'Daily Reading', description: dailyReading },
+    { icon: Users, label: 'Community', description: communityStats },
+    { icon: Calendar, label: 'Events', description: nextEvent },
+    { icon: Heart, label: 'Devotion', description: devotionStats },
   ];
 
   return (
@@ -49,56 +169,46 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
               <h3 className="font-semibold text-gray-900 mb-4">Trending Topics</h3>
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-700">#BhagavadGita</span>
-                  <span className="text-xs text-gray-500">2.1k posts</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-700">#Meditation</span>
-                  <span className="text-xs text-gray-500">1.8k posts</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-700">#Yoga</span>
-                  <span className="text-xs text-gray-500">1.5k posts</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-700">#Diwali2024</span>
-                  <span className="text-xs text-gray-500">1.2k posts</span>
-                </div>
+                {trendingTopics.map((topic) => (
+                  <div
+                    key={topic.topic}
+                    className="flex items-center justify-between"
+                  >
+                    <span className="text-sm text-gray-700">#{topic.topic}</span>
+                    <span className="text-xs text-gray-500">
+                      {topic.count} posts
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
 
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h3 className="font-semibold text-gray-900 mb-4">Suggested Connections</h3>
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white text-sm font-semibold">
-                      R
+                {suggestedConnections.map((connection) => (
+                  <div
+                    key={connection.id}
+                    className="flex items-center justify-between"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+                        {connection.full_name.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {connection.full_name}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {connection.spiritual_path}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Ravi Shankar</p>
-                      <p className="text-xs text-gray-500">Yoga Teacher</p>
-                    </div>
+                    <button className="text-xs text-orange-600 hover:text-orange-700 font-medium">
+                      Follow
+                    </button>
                   </div>
-                  <button className="text-xs text-orange-600 hover:text-orange-700 font-medium">
-                    Follow
-                  </button>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-semibold">
-                      S
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Sita Devi</p>
-                      <p className="text-xs text-gray-500">Sanskrit Scholar</p>
-                    </div>
-                  </div>
-                  <button className="text-xs text-orange-600 hover:text-orange-700 font-medium">
-                    Follow
-                  </button>
-                </div>
+                ))}
               </div>
             </div>
           </div>
