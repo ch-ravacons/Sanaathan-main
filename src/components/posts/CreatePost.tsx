@@ -51,6 +51,40 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
         return;
       }
 
+      // Ensure user profile exists to satisfy FK posts.user_id -> users.id
+      try {
+        const { data: existingProfile } = await supabase
+          .from('users')
+          .select('id')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (!existingProfile) {
+          const { data: authData } = await supabase.auth.getUser();
+          const authUser = authData?.user;
+          const email = authUser?.email || user.email || '';
+          const fallbackName = (authUser?.user_metadata?.full_name || user.full_name || email || 'User').toString();
+
+          const { error: profileInsertError } = await supabase
+            .from('users')
+            .insert([
+              {
+                id: user.id,
+                email,
+                full_name: fallbackName,
+                interests: [],
+                spiritual_path: '',
+                path_practices: [],
+              },
+            ]);
+          if (profileInsertError) {
+            console.warn('Profile insert failed (non-fatal for post create):', profileInsertError.message || profileInsertError);
+          }
+        }
+      } catch (profileErr) {
+        console.warn('Profile ensure threw (non-fatal):', profileErr);
+      }
+
       const { error } = await supabase
         .from('posts')
         .insert([
