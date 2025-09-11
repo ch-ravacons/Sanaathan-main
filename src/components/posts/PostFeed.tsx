@@ -7,38 +7,55 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export const PostFeed: React.FC = () => {
   const { user } = useAuth();
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
+  const hasSupabase = Boolean(supabase);
+  const [posts, setPosts] = useState<Post[]>(hasSupabase ? [] : samplePosts);
+  const [loading, setLoading] = useState(hasSupabase);
 
   const fetchPosts = async () => {
     try {
       if (!supabase) {
-        setPosts(samplePosts);
+        setLoading(false);
         return;
       }
 
-      const { data, error } = await supabase
-        .from('posts')
-        .select(`
-          *,
-          users(*)
-        `)
-        .eq('moderation_status', 'approved')
-        .order('created_at', { ascending: false })
-        .limit(20);
+      const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+        return new Promise((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error('timeout')), ms);
+          promise
+            .then((res) => {
+              clearTimeout(timer);
+              resolve(res);
+            })
+            .catch((err) => {
+              clearTimeout(timer);
+              reject(err);
+            });
+        });
+      };
+
+      const { data, error }: any = await withTimeout(
+        supabase
+          .from('posts')
+          .select(`
+            *,
+            users(*)
+          `)
+          .eq('moderation_status', 'approved')
+          .order('created_at', { ascending: false })
+          .limit(20),
+        3000
+      );
 
       if (error) throw error;
-      
-      // Transform the data to match our Post interface
-      const transformedPosts = (data || []).map(post => ({
+
+      const transformedPosts = (data || []).map((post: any) => ({
         ...post,
-        user: post.users
+        user: post.users,
       }));
-      
-      setPosts(transformedPosts);
+
+      setPosts(transformedPosts.length ? transformedPosts : samplePosts);
     } catch (error) {
       console.error('Error fetching posts:', error);
-      // For demo purposes, show sample posts
       setPosts(samplePosts);
     } finally {
       setLoading(false);
@@ -46,8 +63,9 @@ export const PostFeed: React.FC = () => {
   };
 
   useEffect(() => {
+    if (!hasSupabase) return;
     fetchPosts();
-  }, []);
+  }, [hasSupabase]);
 
   const handlePostCreated = () => {
     fetchPosts();
