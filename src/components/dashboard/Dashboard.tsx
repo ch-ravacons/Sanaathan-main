@@ -4,7 +4,11 @@ import { Welcome } from './Welcome';
 import { PostFeed } from '../posts/PostFeed';
 import { BookOpen, Users, Calendar, Heart } from 'lucide-react';
 
-export const Dashboard: React.FC = () => {
+interface DashboardProps {
+  onNavigate: (page: 'dashboard' | 'profile') => void;
+}
+
+export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
   const quickActions = [
     { icon: BookOpen, label: 'Daily Reading', description: 'Bhagavad Gita Chapter 4' },
@@ -15,7 +19,7 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header />
+      <Header onProfile={() => onNavigate('profile')} />
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Welcome />

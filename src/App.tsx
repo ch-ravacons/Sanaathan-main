@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AuthProvider } from './contexts/AuthContext';
 import { AuthPage } from './components/auth/AuthPage';
 import { Dashboard } from './components/dashboard/Dashboard';
+import { ProfilePage } from './components/profile/ProfilePage';
 import { useAuth } from './contexts/AuthContext';
 
 const AppContent: React.FC = () => {
   const { user, session, loading } = useAuth();
+  const [currentPage, setCurrentPage] = useState<'dashboard' | 'profile'>('dashboard');
 
   console.log(
     '🏠 App state - user:',
@@ -36,11 +38,20 @@ const AppContent: React.FC = () => {
 
   console.log(
     '🎨 Rendering:',
-    session ? 'Dashboard' : 'AuthPage',
+    session ? currentPage : 'AuthPage',
     'timestamp:',
     new Date().toISOString()
   );
-  return session ? <Dashboard /> : <AuthPage />;
+
+  if (!session) {
+    return <AuthPage />;
+  }
+
+  return currentPage === 'profile' ? (
+    <ProfilePage onBack={() => setCurrentPage('dashboard')} />
+  ) : (
+    <Dashboard onNavigate={(page) => setCurrentPage(page)} />
+  );
 };
 
 const App: React.FC = () => {
