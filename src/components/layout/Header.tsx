@@ -3,7 +3,11 @@ import { Sun, Bell, Search, User, LogOut } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../ui/Button';
 
-export const Header: React.FC = () => {
+interface HeaderProps {
+  onProfile?: () => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({ onProfile }) => {
   const { user, signOut } = useAuth();
 
   return (
@@ -38,11 +42,14 @@ export const Header: React.FC = () => {
               <Bell className="w-5 h-5" />
             </Button>
             
-            <div className="flex items-center space-x-3">
+            <button
+              onClick={onProfile}
+              className="flex items-center space-x-3 focus:outline-none"
+            >
               <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
                 <User className="w-4 h-4 text-white" />
               </div>
-              <div className="hidden md:block">
+              <div className="hidden md:block text-left">
                 <p className="text-sm font-medium text-gray-900">
                   {user?.spiritual_name || user?.full_name || 'User'}
                 </p>
@@ -50,7 +57,7 @@ export const Header: React.FC = () => {
                   {user?.spiritual_path || 'Spiritual Seeker'}
                 </p>
               </div>
-            </div>
+            </button>
 
             <Button
               variant="ghost"
