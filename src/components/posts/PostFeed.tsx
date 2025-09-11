@@ -12,7 +12,9 @@ export const PostFeed: React.FC = () => {
   const [loading, setLoading] = useState(hasSupabase);
 
   const interestsKey = user?.interests?.join(',') || '';
+
   const userId = user?.id;
+n
 
   const fetchPosts = useCallback(async () => {
     try {
@@ -21,12 +23,17 @@ export const PostFeed: React.FC = () => {
         return;
       }
 
+
       let query = supabase
+
+      const { data, error }: any = await supabase
+
         .from('posts')
         .select(`
           *,
           users(*)
         `)
+
         .order('created_at', { ascending: false })
         .limit(20);
 
@@ -35,6 +42,11 @@ export const PostFeed: React.FC = () => {
         : query.eq('moderation_status', 'approved');
 
       const { data, error }: any = await query;
+
+        .eq('moderation_status', 'approved')
+        .order('created_at', { ascending: false })
+        .limit(20);
+
 
       if (error) throw error;
 
@@ -61,7 +73,11 @@ export const PostFeed: React.FC = () => {
     } finally {
       setLoading(false);
     }
+
   }, [interestsKey, userId]);
+
+  
+
 
   useEffect(() => {
     if (!hasSupabase) return;
