@@ -20,33 +20,15 @@ export const PostFeed: React.FC = () => {
         return;
       }
 
-      const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
-        return new Promise((resolve, reject) => {
-          const timer = setTimeout(() => reject(new Error('timeout')), ms);
-          promise
-            .then((res) => {
-              clearTimeout(timer);
-              resolve(res);
-            })
-            .catch((err) => {
-              clearTimeout(timer);
-              reject(err);
-            });
-        });
-      };
-
-      const { data, error }: any = await withTimeout(
-        supabase
-          .from('posts')
-          .select(`
-            *,
-            users(*)
-          `)
-          .eq('moderation_status', 'approved')
-          .order('created_at', { ascending: false })
-          .limit(20),
-        3000
-      );
+      const { data, error }: any = await supabase
+        .from('posts')
+        .select(`
+          *,
+          users(*)
+        `)
+        .eq('moderation_status', 'approved')
+        .order('created_at', { ascending: false })
+        .limit(20);
 
       if (error) throw error;
 
