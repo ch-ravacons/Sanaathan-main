@@ -10,6 +10,7 @@ export const PostFeed: React.FC = () => {
   const hasSupabase = Boolean(supabase);
   const [posts, setPosts] = useState<Post[]>(hasSupabase ? [] : samplePosts);
   const [loading, setLoading] = useState<boolean>(hasSupabase);
+  const [usingSample, setUsingSample] = useState<boolean>(!hasSupabase);
 
   const interestsKey = user?.interests?.join(',') || '';
   const userId = user?.id ?? null;
@@ -65,10 +66,17 @@ export const PostFeed: React.FC = () => {
         transformedPosts = [...preferred, ...others];
       }
 
-      setPosts(transformedPosts.length ? transformedPosts : samplePosts);
+      if (transformedPosts.length) {
+        setPosts(transformedPosts);
+        setUsingSample(false);
+      } else {
+        setPosts(samplePosts);
+        setUsingSample(true);
+      }
     } catch (err) {
       console.error('Error fetching posts:', err);
       setPosts(samplePosts);
+      setUsingSample(true);
     } finally {
       setLoading(false);
     }
@@ -77,6 +85,17 @@ export const PostFeed: React.FC = () => {
   useEffect(() => {
     if (!hasSupabase) return;
     fetchPosts();
+
+    // Fail-safe: don't keep skeleton forever if network hangs
+    const timeout = setTimeout(() => {
+      setLoading(false);
+      if (!posts.length) {
+        setPosts(samplePosts);
+        setUsingSample(true);
+      }
+    }, 4000);
+
+    return () => clearTimeout(timeout);
   }, [hasSupabase, fetchPosts]);
 
   const handlePostCreated = () => {
@@ -112,6 +131,12 @@ export const PostFeed: React.FC = () => {
   return (
     <div>
       <CreatePost onPostCreated={handlePostCreated} />
+
+      {usingSample && (
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded">
+          Showing sample posts. Connect Supabase or sign in to see live posts.
+        </div>
+      )}
 
       <div className="space-y-4">
         {posts.map((post) => (

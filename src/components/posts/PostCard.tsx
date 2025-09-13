@@ -4,6 +4,7 @@ import { Post } from '../../types';
 import { Button } from '../ui/Button';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../ui/Toast';
 import { spiritualTopics } from '../../data/spiritualTopics';
 
 interface PostCardProps {
@@ -13,14 +14,20 @@ interface PostCardProps {
 
 export const PostCard: React.FC<PostCardProps> = ({ post, onUpdate }) => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [liked, setLiked] = useState(false);
   const [likeLoading, setLikeLoading] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const topic = post.spiritual_topic ? 
+  const topic = post.spiritual_topic ?
     spiritualTopics.find(t => t.id === post.spiritual_topic) : null;
+
+  const safeTags = Array.isArray(post.tags) ? post.tags : [];
+  const likes = typeof post.likes_count === 'number' ? post.likes_count : 0;
+  const comments = typeof post.comments_count === 'number' ? post.comments_count : 0;
+  const shares = typeof post.shares_count === 'number' ? post.shares_count : 0;
 
   const handleLike = async () => {
     if (!user) return;
@@ -29,7 +36,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onUpdate }) => {
     setLikeLoading(true);
     try {
       if (!supabase) {
-        alert('Database connection not available');
+        toast('Database connection not available', 'error');
         return;
       }
       
@@ -61,7 +68,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onUpdate }) => {
     setLoading(true);
     try {
       if (!supabase) {
-        alert('Database connection not available');
+        toast('Database connection not available', 'error');
         return;
       }
 
@@ -90,7 +97,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onUpdate }) => {
 
     try {
       if (!supabase) {
-        alert('Database connection not available');
+        toast('Database connection not available', 'error');
         return;
       }
 
@@ -102,7 +109,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onUpdate }) => {
           reason: reason.trim(),
         }]);
 
-      alert('Post has been reported. Our moderation team will review it.');
+      toast('Post reported. Our moderation team will review it.', 'info');
     } catch (error) {
       console.error('Error reporting post:', error);
     }
@@ -163,9 +170,9 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onUpdate }) => {
           {post.content}
         </p>
         
-        {post.tags.length > 0 && (
+        {safeTags.length > 0 && (
           <div className="flex flex-wrap gap-2 mt-3">
-            {post.tags.map((tag, index) => (
+            {safeTags.map((tag, index) => (
               <span
                 key={index}
                 className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-md"
@@ -187,7 +194,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onUpdate }) => {
             }`}
           >
             <Heart className={`w-5 h-5 ${liked ? 'fill-current' : ''}`} />
-            <span className="text-sm">{post.likes_count}</span>
+            <span className="text-sm">{likes}</span>
           </button>
           
           <button
@@ -195,12 +202,12 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onUpdate }) => {
             className="flex items-center space-x-2 text-gray-500 hover:text-blue-600 transition-colors"
           >
             <MessageCircle className="w-5 h-5" />
-            <span className="text-sm">{post.comments_count}</span>
+            <span className="text-sm">{comments}</span>
           </button>
           
           <button className="flex items-center space-x-2 text-gray-500 hover:text-green-600 transition-colors">
             <Share2 className="w-5 h-5" />
-            <span className="text-sm">{post.shares_count}</span>
+            <span className="text-sm">{shares}</span>
           </button>
         </div>
       </div>

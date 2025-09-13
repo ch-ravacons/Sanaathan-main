@@ -6,6 +6,7 @@ import { spiritualTopics } from '../../data/spiritualTopics';
 import { moderateContent, generateContentSuggestions } from '../../utils/contentModeration';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../ui/Toast';
 
 interface CreatePostProps {
   onPostCreated: () => void;
@@ -13,6 +14,7 @@ interface CreatePostProps {
 
 export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [content, setContent] = useState('');
   const [selectedTopic, setSelectedTopic] = useState('');
   const [tags, setTags] = useState('');
@@ -33,8 +35,8 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!content.trim()) return;
-    if (!user) {
-      alert('You must be signed in to create a post.');
+    if (content.trim().length < 10) {
+      toast('Please enter at least 10 characters to post.', 'warning');
       return;
     }
 
@@ -46,9 +48,21 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
       const tagsArray = tags.split(',').map(tag => tag.trim()).filter(Boolean);
 
       if (!supabase) {
-        alert('Database connection not available. Please check your Supabase configuration.');
+        toast('Database connection not available. Please check your Supabase configuration.', 'error');
         setLoading(false);
         return;
+      }
+
+      // If context user is not yet ready, fall back to auth API
+      let effectiveUserId = user?.id;
+      if (!effectiveUserId) {
+        const { data: authData } = await supabase.auth.getUser();
+        effectiveUserId = authData?.user?.id;
+        if (!effectiveUserId) {
+          toast('You must be signed in to create a post.', 'warning');
+          setLoading(false);
+          return;
+        }
       }
 
       // Ensure user profile exists to satisfy FK posts.user_id -> users.id
@@ -56,20 +70,20 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
         const { data: existingProfile } = await supabase
           .from('users')
           .select('id')
-          .eq('id', user.id)
+          .eq('id', effectiveUserId)
           .maybeSingle();
 
         if (!existingProfile) {
           const { data: authData } = await supabase.auth.getUser();
           const authUser = authData?.user;
-          const email = authUser?.email || user.email || '';
-          const fallbackName = (authUser?.user_metadata?.full_name || user.full_name || email || 'User').toString();
+          const email = authUser?.email || user?.email || '';
+          const fallbackName = (authUser?.user_metadata?.full_name || user?.full_name || email || 'User').toString();
 
           const { error: profileInsertError } = await supabase
             .from('users')
             .insert([
               {
-                id: user.id,
+                id: effectiveUserId,
                 email,
                 full_name: fallbackName,
                 interests: [],
@@ -89,7 +103,7 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
         .from('posts')
         .insert([
           {
-            user_id: user.id,
+            user_id: effectiveUserId!,
             content: content.trim(),
             spiritual_topic: selectedTopic || null,
             tags: tagsArray,
@@ -104,15 +118,25 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
       setTags('');
       setModeration(null);
       onPostCreated();
-      
+
       if (!moderationResult.isAppropriate || moderationResult.score < 5) {
-        alert('Your post has been submitted for review. It will be visible once approved by our moderation team.');
+        toast('Post submitted for review. It will be visible once approved.', 'info');
       } else {
-        alert('Your post has been published!');
+        toast('Your post has been published!', 'success');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating post:', error);
-      alert('Failed to create post. Please try again.');
+      const message = error?.message || String(error);
+      // Friendly hints for common failures
+      if (message.includes('foreign key constraint')) {
+        toast('Profile not ready. Sign out and sign in again, then retry posting.', 'warning');
+      } else if (message.includes('length') || message.includes('check constraint')) {
+        toast('Message must be between 10 and 1000 characters.', 'warning');
+      } else if (message.toLowerCase().includes('rls')) {
+        toast('Permission error while creating post. Please ensure you are signed in.', 'error');
+      } else {
+        toast(`Failed to create post: ${message}`, 'error');
+      }
     } finally {
       setLoading(false);
     }
@@ -256,7 +280,7 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
           <Button
             type="submit"
             loading={loading}
-            disabled={!content.trim() || content.length > 1000}
+            disabled={!content.trim() || content.trim().length < 10 || content.length > 1000}
           >
             <Send className="w-4 h-4 mr-2" />
             Share Post
