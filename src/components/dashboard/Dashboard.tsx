@@ -15,6 +15,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const { user } = useAuth();
   const hasSupabase = Boolean(supabase);
 
+  // Quick Actions (defaults shown until DB returns)
   const [dailyReading, setDailyReading] = useState('Bhagavad Gita Chapter 4');
   const [communityStats, setCommunityStats] = useState('0 members');
   const [nextEvent, setNextEvent] = useState('No upcoming events');
@@ -23,23 +24,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const [trendingTopics, setTrendingTopics] = useState<{
     topic: string;
     count: number;
-  }[]>([
-    { topic: 'BhagavadGita', count: 2100 },
-    { topic: 'Meditation', count: 1800 },
-    { topic: 'Yoga', count: 1500 },
-    { topic: 'Diwali2024', count: 1200 },
-  ]);
+  }[]>([]);
 
   const [suggestedConnections, setSuggestedConnections] = useState<
     Pick<User, 'id' | 'full_name' | 'spiritual_path'>[]
-  >([
-    { id: '1', full_name: 'Ravi Shankar', spiritual_path: 'Yoga Teacher' },
-    { id: '2', full_name: 'Sita Devi', spiritual_path: 'Sanskrit Scholar' },
-  ]);
+  >([]);
 
   const fetchQuickStats = useCallback(async () => {
     if (!supabase) return;
     try {
+      // Daily Reading (today or most recent past)
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        const { data: reading } = await supabase
+          .from('daily_readings')
+          .select('title, reference, reading_date')
+          .lte('reading_date', today)
+          .order('reading_date', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (reading?.title) {
+          setDailyReading(reading.reference ? `${reading.title} ${reading.reference}` : reading.title);
+        }
+      } catch {}
+
       const { count: userCount } = await supabase
         .from('users')
         .select('*', { count: 'exact', head: true });
@@ -77,9 +85,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         .map(([topic, count]) => ({ topic, count }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 4);
-      if (topics.length) {
-        setTrendingTopics(topics);
-      }
+      setTrendingTopics(topics);
     } catch (error) {
       console.error('Error fetching trending topics:', error);
     }
@@ -113,12 +119,42 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             full_name: u.full_name,
             spiritual_path: u.spiritual_path,
           }));
-        if (sorted.length) {
-          setSuggestedConnections(sorted);
-        }
+        setSuggestedConnections(sorted);
       }
     } catch (error) {
       console.error('Error fetching suggested connections:', error);
+    }
+  }, [user]);
+
+  const fetchDevotion = useCallback(async () => {
+    if (!supabase) return;
+    try {
+      if (!user) {
+        setDevotionStats('Daily practice tracker');
+        return;
+      }
+      const { data, error } = await supabase
+        .from('practice_logs')
+        .select('practiced_on')
+        .eq('user_id', user.id)
+        .order('practiced_on', { ascending: false })
+        .limit(30);
+      if (error) throw error;
+
+      const days = (data || []).map((r: any) => r.practiced_on);
+      if (!days.length) {
+        setDevotionStats('No practice logged yet');
+        return;
+      }
+      const toKey = (d: Date) => d.toISOString().slice(0, 10);
+      const set = new Set(days);
+      let streak = 0;
+      let cur = new Date();
+      if (!set.has(toKey(cur))) cur.setDate(cur.getDate() - 1);
+      while (set.has(toKey(cur))) { streak += 1; cur.setDate(cur.getDate() - 1); }
+      setDevotionStats(streak > 0 ? `${streak}-day streak` : 'No practice today');
+    } catch (e) {
+      console.error('Error fetching devotion stats:', e);
     }
   }, [user]);
 
@@ -127,8 +163,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       fetchQuickStats();
       fetchTrending();
       fetchSuggestions();
+      fetchDevotion();
     }
-  }, [hasSupabase, fetchQuickStats, fetchTrending, fetchSuggestions]);
+  }, [hasSupabase, fetchQuickStats, fetchTrending, fetchSuggestions, fetchDevotion]);
 
   const quickActions = [
     { icon: BookOpen, label: 'Daily Reading', description: dailyReading },
@@ -169,6 +206,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
               <h3 className="font-semibold text-gray-900 mb-4">Trending Topics</h3>
               <div className="space-y-3">
+                {trendingTopics.length === 0 && (
+                  <div className="text-sm text-gray-500">No trending topics yet</div>
+                )}
                 {trendingTopics.map((topic) => (
                   <div
                     key={topic.topic}
@@ -186,6 +226,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h3 className="font-semibold text-gray-900 mb-4">Suggested Connections</h3>
               <div className="space-y-4">
+                {suggestedConnections.length === 0 && (
+                  <div className="text-sm text-gray-500">No suggestions yet</div>
+                )}
                 {suggestedConnections.map((connection) => (
                   <div
                     key={connection.id}

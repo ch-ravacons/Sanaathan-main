@@ -51,7 +51,7 @@ export const Header: React.FC<HeaderProps> = ({ onProfile }) => {
               </div>
               <div className="hidden md:block text-left">
                 <p className="text-sm font-medium text-gray-900">
-                  {user?.spiritual_name || user?.full_name || 'User'}
+                  {user?.spiritual_name || user?.full_name || user?.email || 'User'}
                 </p>
                 <p className="text-xs text-gray-500">
                   {user?.spiritual_path || 'Spiritual Seeker'}

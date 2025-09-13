@@ -21,6 +21,14 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // Only attempt to create the client if both values are present; otherwise
 // the consuming components can gracefully handle a `null` client.
 export const supabase =
-  supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+  supabaseUrl && supabaseAnonKey
+    ? createClient(supabaseUrl, supabaseAnonKey, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+        },
+      })
+    : null;
 
 export { supabaseUrl as supabaseUrlExport };

@@ -4,16 +4,20 @@ import { CreatePost } from './CreatePost';
 import { Post } from '../../types';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../ui/Toast';
 
 export const PostFeed: React.FC = () => {
-  const { user } = useAuth();
+  const { user, session, loading: authLoading } = useAuth();
+  const { toast } = useToast();
   const hasSupabase = Boolean(supabase);
   const [posts, setPosts] = useState<Post[]>(hasSupabase ? [] : samplePosts);
   const [loading, setLoading] = useState<boolean>(hasSupabase);
   const [usingSample, setUsingSample] = useState<boolean>(!hasSupabase);
+  const [activeTab, setActiveTab] = useState<'all' | 'mine'>('all');
 
   const interestsKey = user?.interests?.join(',') || '';
-  const userId = user?.id ?? null;
+  // Prefer profile id; fall back to auth session id in case profile hasn't loaded yet
+  const effectiveUserId = user?.id || session?.user?.id || null;
 
   const fetchPosts = useCallback(async () => {
     try {
@@ -22,29 +26,34 @@ export const PostFeed: React.FC = () => {
         return;
       }
 
-      // Base query: posts + joined user row
+      // Build query based on tab
       let query = supabase
         .from('posts')
-        .select(
-          `
+        .select(`
           *,
           users(*)
-        `
-        );
+        `);
 
-      // Show approved posts to everyone; include my own posts even if not yet approved
-      if (userId) {
-        query = query.or(
-          `moderation_status.eq.approved,user_id.eq.${encodeURIComponent(userId)}`
-        );
+      if (activeTab === 'mine') {
+        if (!effectiveUserId) {
+          setPosts([]);
+          setUsingSample(false);
+          toast('Sign in to view your posts.', 'info');
+          return;
+        }
+        query = query.eq('user_id', effectiveUserId);
       } else {
-        query = query.eq('moderation_status', 'approved');
+        // All posts: show approved for everyone; include my own if signed in
+        if (effectiveUserId) {
+          query = query.or(`moderation_status.eq.approved,user_id.eq.${effectiveUserId}`);
+        } else {
+          query = query.eq('moderation_status', 'approved');
+        }
       }
 
-      // Finalize ordering/paging
-      query = query.order('created_at', { ascending: false }).limit(20);
-
-      const { data, error } = await query;
+      const { data, error } = await query
+        .order('created_at', { ascending: false })
+        .limit(20);
 
       if (error) throw error;
 
@@ -70,8 +79,9 @@ export const PostFeed: React.FC = () => {
         setPosts(transformedPosts);
         setUsingSample(false);
       } else {
-        setPosts(samplePosts);
-        setUsingSample(true);
+        // No live posts yet; show empty state (not sample data)
+        setPosts([]);
+        setUsingSample(false);
       }
     } catch (err) {
       console.error('Error fetching posts:', err);
@@ -80,23 +90,19 @@ export const PostFeed: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [interestsKey, userId]);
+  }, [interestsKey, effectiveUserId, activeTab]);
 
   useEffect(() => {
     if (!hasSupabase) return;
+    if (authLoading) return; // wait for session to restore so RLS includes my pending posts
     fetchPosts();
 
-    // Fail-safe: don't keep skeleton forever if network hangs
     const timeout = setTimeout(() => {
       setLoading(false);
-      if (!posts.length) {
-        setPosts(samplePosts);
-        setUsingSample(true);
-      }
     }, 4000);
 
     return () => clearTimeout(timeout);
-  }, [hasSupabase, fetchPosts]);
+  }, [hasSupabase, authLoading, session?.user?.id, effectiveUserId, activeTab, fetchPosts]);
 
   const handlePostCreated = () => {
     fetchPosts();
@@ -132,9 +138,32 @@ export const PostFeed: React.FC = () => {
     <div>
       <CreatePost onPostCreated={handlePostCreated} />
 
+      {/* Tabs */}
+      <div className="mb-4">
+        <div className="inline-flex bg-gray-100 rounded-lg p-1">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`px-4 py-1.5 text-sm rounded-md ${
+              activeTab === 'all' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-600 hover:text-gray-800'
+            }`}
+          >
+            All Posts
+          </button>
+          <button
+            onClick={() => setActiveTab('mine')}
+            className={`px-4 py-1.5 text-sm rounded-md ${
+              activeTab === 'mine' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-600 hover:text-gray-800'
+            }`}
+            disabled={!(user || session)}
+          >
+            My Posts
+          </button>
+        </div>
+      </div>
+
       {usingSample && (
         <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded">
-          Showing sample posts. Connect Supabase or sign in to see live posts.
+          Showing sample posts (live data unavailable). Check Supabase config or network.
         </div>
       )}
 

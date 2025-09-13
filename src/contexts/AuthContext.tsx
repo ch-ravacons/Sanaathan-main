@@ -32,21 +32,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Lightweight, safe cache of display-only profile fields (not tokens)
+  const USER_CACHE_KEY = 'sd_user_cache_v1';
+
+  // Hydrate UI quickly from cache so the header shows a name on refresh
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(USER_CACHE_KEY);
+      if (raw) {
+        const cached = JSON.parse(raw);
+        // Do not end loading here; this is only for initial UI hints
+        if (cached && cached.id) {
+          setUser((prev) => prev ?? cached);
+        }
+      }
+    } catch {}
+  }, []);
+
   useEffect(() => {
     let alive = true;
-    let timeoutId: NodeJS.Timeout;
+    // Failsafe: don't keep the app in a perpetual loading state
+    const timeoutId = setTimeout(() => {
+      if (alive) {
+        console.log('⏰ Auth init fallback timeout – ending loading state');
+        setLoading(false);
+      }
+    }, 5000);
 
     // Initial session load
     (async () => {
       try {
-        // Set a timeout to prevent infinite loading
-        timeoutId = setTimeout(() => {
-          if (alive) {
-            console.log('⏰ Auth initialization timeout - setting loading to false');
-            setLoading(false);
-          }
-        }, 3000); // 3 second timeout
-
         if (!supabase) {
           console.log('❌ Supabase not configured - skipping auth initialization');
           if (alive) {
@@ -64,7 +79,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const sess = data?.session ?? null;
         if (!alive) return;
 
-        clearTimeout(timeoutId);
         setSession(sess);
 
         const uid = sess?.user?.id;
@@ -73,12 +87,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           setLoading(false);
         }
+        clearTimeout(timeoutId);
       } catch (e) {
         console.error('❌ getSession thrown:', e);
         if (alive) {
-          clearTimeout(timeoutId);
           setLoading(false);
         }
+        clearTimeout(timeoutId);
       }
     })();
 
@@ -123,42 +138,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const { data: authData } = await supabase.auth.getUser();
         const authUser = authData?.user;
         if (authUser) {
-          setUser({
+          const fallbackUser: User = {
             id: authUser.id,
             email: authUser.email || '',
-            full_name: authUser.user_metadata?.full_name || '',
+            full_name: authUser.user_metadata?.full_name || authUser.email || 'User',
             spiritual_name: authUser.user_metadata?.spiritual_name,
             interests: [],
             spiritual_path: '',
             path_practices: [],
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-          });
+          } as User;
+          setUser(fallbackUser);
+          try { localStorage.setItem(USER_CACHE_KEY, JSON.stringify(fallbackUser)); } catch {}
         } else {
           setUser(null);
+          try { localStorage.removeItem(USER_CACHE_KEY); } catch {}
         }
         return;
       }
 
       setUser(data as User);
+      try { localStorage.setItem(USER_CACHE_KEY, JSON.stringify(data)); } catch {}
     } catch (e: any) {
       console.warn('⚠️ Profile fetch threw (non-fatal):', e?.message ?? e);
       const { data: authData } = await supabase.auth.getUser();
       const authUser = authData?.user;
       if (authUser) {
-        setUser({
+        const fallbackUser: User = {
           id: authUser.id,
           email: authUser.email || '',
-          full_name: authUser.user_metadata?.full_name || '',
+          full_name: authUser.user_metadata?.full_name || authUser.email || 'User',
           spiritual_name: authUser.user_metadata?.spiritual_name,
           interests: [],
           spiritual_path: '',
           path_practices: [],
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        });
+        } as User;
+        setUser(fallbackUser);
+        try { localStorage.setItem(USER_CACHE_KEY, JSON.stringify(fallbackUser)); } catch {}
       } else {
         setUser(null);
+        try { localStorage.removeItem(USER_CACHE_KEY); } catch {}
       }
     } finally {
       // Always end the loading state, even if profile failed
@@ -239,6 +261,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       setSession(null);
       setLoading(false);
+      try { localStorage.removeItem(USER_CACHE_KEY); } catch {}
     }
   };
 
