@@ -20,6 +20,10 @@ export const PostFeed: React.FC = () => {
   // Prefer profile id; fall back to auth session id in case profile hasn't loaded yet
   const effectiveUserId = user?.id || session?.user?.id || null;
 
+  const authLoadingRef = useRef(authLoading);
+  const activeTabRef = useRef(activeTab);
+  const effectiveUserIdRef = useRef(effectiveUserId);
+
   const fetchPosts = useCallback(async () => {
     try {
       if (!supabase) {
@@ -104,6 +108,12 @@ export const PostFeed: React.FC = () => {
 
   // Fast public fetch: on initial load, fetch approved posts immediately
   // so the network call happens even if the session is still restoring.
+  useEffect(() => {
+    authLoadingRef.current = authLoading;
+    activeTabRef.current = activeTab;
+    effectiveUserIdRef.current = effectiveUserId;
+  }, [authLoading, activeTab, effectiveUserId]);
+
   const fetchPublicApproved = useCallback(async () => {
     try {
       if (!supabase) return;
@@ -118,6 +128,11 @@ export const PostFeed: React.FC = () => {
         .limit(20);
       if (error) throw error;
       const transformed: Post[] = (data ?? []).map((p: any) => ({ ...p, user: p.users }));
+
+      if ((!authLoadingRef.current && effectiveUserIdRef.current) || activeTabRef.current !== 'all') {
+        return;
+      }
+
       setPosts(transformed);
       setUsingSample(false);
     } catch (err) {
