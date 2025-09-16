@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { PostCard } from './PostCard';
 import { CreatePost } from './CreatePost';
 import { Post } from '../../types';
@@ -14,6 +14,7 @@ export const PostFeed: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(hasSupabase);
   const [usingSample, setUsingSample] = useState<boolean>(!hasSupabase);
   const [activeTab, setActiveTab] = useState<'all' | 'mine'>('all');
+  const publicFetchedOnce = useRef(false);
 
   const interestsKey = user?.interests?.join(',') || '';
   // Prefer profile id; fall back to auth session id in case profile hasn't loaded yet
@@ -27,12 +28,7 @@ export const PostFeed: React.FC = () => {
       }
 
       // Build query based on tab
-      let query = supabase
-        .from('posts')
-        .select(`
-          *,
-          users(*)
-        `);
+      let query;
 
       if (activeTab === 'mine') {
         if (!effectiveUserId) {
@@ -41,9 +37,20 @@ export const PostFeed: React.FC = () => {
           toast('Sign in to view your posts.', 'info');
           return;
         }
-        query = query.eq('user_id', effectiveUserId);
+        // For 'My Posts', we don't need the users join; use local profile for display
+        query = supabase
+          .from('posts')
+          .select('*')
+          .eq('user_id', effectiveUserId);
       } else {
         // All posts: show approved for everyone; include my own if signed in
+        query = supabase
+          .from('posts')
+          .select(`
+            *,
+            users(*)
+          `);
+
         if (effectiveUserId) {
           query = query.or(`moderation_status.eq.approved,user_id.eq.${effectiveUserId}`);
         } else {
@@ -57,11 +64,14 @@ export const PostFeed: React.FC = () => {
 
       if (error) throw error;
 
-      // Map joined user object
-      let transformedPosts: Post[] = (data ?? []).map((post: any) => ({
-        ...post,
-        user: post.users, // keep your Post.user shape
-      }));
+      // Map user for rendering
+      let transformedPosts: Post[] = (data ?? []).map((post: any) => {
+        if (activeTab === 'mine') {
+          // Use local user context for display to avoid depending on users join
+          return { ...post, user: user || undefined } as Post;
+        }
+        return { ...post, user: post.users } as Post;
+      });
 
       // Optional interests-based prioritization
       if (interestsKey) {
@@ -92,9 +102,42 @@ export const PostFeed: React.FC = () => {
     }
   }, [interestsKey, effectiveUserId, activeTab]);
 
+  // Fast public fetch: on initial load, fetch approved posts immediately
+  // so the network call happens even if the session is still restoring.
+  const fetchPublicApproved = useCallback(async () => {
+    try {
+      if (!supabase) return;
+      const { data, error } = await supabase
+        .from('posts')
+        .select(`
+          *,
+          users(*)
+        `)
+        .eq('moderation_status', 'approved')
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      const transformed: Post[] = (data ?? []).map((p: any) => ({ ...p, user: p.users }));
+      setPosts(transformed);
+      setUsingSample(false);
+    } catch (err) {
+      console.error('Error fetching public posts:', err);
+      setUsingSample(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!hasSupabase) return;
-    if (authLoading) return; // wait for session to restore so RLS includes my pending posts
+    if (authLoading) {
+      // While session restores, perform a one-time public fetch for All tab
+      if (activeTab === 'all' && !publicFetchedOnce.current) {
+        publicFetchedOnce.current = true;
+        fetchPublicApproved();
+      }
+      return;
+    }
     fetchPosts();
 
     const timeout = setTimeout(() => {
@@ -102,7 +145,7 @@ export const PostFeed: React.FC = () => {
     }, 4000);
 
     return () => clearTimeout(timeout);
-  }, [hasSupabase, authLoading, session?.user?.id, effectiveUserId, activeTab, fetchPosts]);
+  }, [hasSupabase, authLoading, session?.user?.id, effectiveUserId, activeTab, fetchPosts, fetchPublicApproved]);
 
   const handlePostCreated = () => {
     fetchPosts();
