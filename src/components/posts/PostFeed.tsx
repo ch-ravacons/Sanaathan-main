@@ -129,7 +129,7 @@ export const PostFeed: React.FC = () => {
       if (error) throw error;
       const transformed: Post[] = (data ?? []).map((p: any) => ({ ...p, user: p.users }));
 
-      if ((!authLoadingRef.current && effectiveUserIdRef.current) || activeTabRef.current !== 'all') {
+      if (effectiveUserIdRef.current || activeTabRef.current !== 'all') {
         return;
       }
 
