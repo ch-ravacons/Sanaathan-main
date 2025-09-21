@@ -1,4 +1,4 @@
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyPluginCallback } from 'fastify';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import helmet from '@fastify/helmet';
@@ -24,7 +24,7 @@ export async function createServer({ container, config }: ServerDependencies): P
   // Decorate fastify instance with container so handlers can resolve dependencies
   app.decorate('container', container);
 
-  await app.register(helmet);
+  await app.register(getFastify4CompatibleHelmetPlugin());
   await app.register(cors, {
     origin: true,
     credentials: true
@@ -57,6 +57,32 @@ export async function createServer({ container, config }: ServerDependencies): P
   app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
 
   return app;
+}
+
+function getFastify4CompatibleHelmetPlugin() {
+  const plugin = (helmet as unknown) as FastifyPluginCallback;
+  const metaSymbol = Symbol.for('plugin-meta');
+  const pluginWithMeta = (plugin as unknown as Record<symbol, unknown>);
+  const meta = pluginWithMeta[metaSymbol] as
+    | { fastify?: string }
+    | undefined;
+
+  if (meta) {
+    const supportedRange = meta.fastify;
+    if (typeof supportedRange === 'string') {
+      const supportsFastify4 = supportedRange
+        .split('||')
+        .some((range) => range.trim().startsWith('4'));
+
+      if (!supportsFastify4) {
+        meta.fastify = `${supportedRange} || 4.x`;
+      }
+    } else {
+      meta.fastify = '4.x';
+    }
+  }
+
+  return plugin;
 }
 
 declare module 'fastify' {
