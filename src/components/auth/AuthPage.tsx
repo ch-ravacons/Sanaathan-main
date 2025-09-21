@@ -63,7 +63,7 @@ export const AuthPage: React.FC = () => {
                 <Sun className="w-10 h-10 text-white" />
               </div>
               <h1 className="text-4xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
-                Sanatana Dharma
+                Sanatana One
               </h1>
             </div>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">

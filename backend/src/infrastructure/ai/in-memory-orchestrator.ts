@@ -36,7 +36,8 @@ export class InMemoryAiOrchestrator implements AiOrchestrator {
       output,
       citations: retrieved,
       metadata: {
-        agent: invocation.agent
+        agent: invocation.agent,
+        context: invocation.context ?? null
       }
     };
   }

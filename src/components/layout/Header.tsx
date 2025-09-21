@@ -20,7 +20,7 @@ export const Header: React.FC<HeaderProps> = ({ onProfile }) => {
               <Sun className="w-6 h-6 text-white" />
             </div>
             <h1 className="text-xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
-              Sanatana Dharma
+              Sanatana One
             </h1>
           </div>
 

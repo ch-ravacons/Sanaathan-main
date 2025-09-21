@@ -4,6 +4,8 @@ import { z } from 'zod';
 import type { CreatePostUseCase } from '../../app/use-cases/posts/create-post.js';
 import type { ListUserPostsUseCase } from '../../app/use-cases/posts/list-user-posts.js';
 import type { ListFeedUseCase } from '../../app/use-cases/posts/list-feed.js';
+import type { ListTrendingTopicsUseCase } from '../../app/use-cases/posts/list-trending-topics.js';
+import type { GenerateMediaUploadUrlUseCase } from '../../app/use-cases/posts/generate-media-upload-url.js';
 import type { Post } from '../../domain/posts/post.entity.js';
 
 const CreatePostSchema = z.object({
@@ -39,6 +41,17 @@ const FeedQuerySchema = z
       })
   })
   .transform((value) => value);
+
+const TrendingQuerySchema = z.object({
+  window: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(25).optional()
+});
+
+const UploadUrlSchema = z.object({
+  userId: z.string().uuid(),
+  mediaType: z.enum(['image', 'video']),
+  fileName: z.string().min(3)
+});
 
 function adaptPost(post: Post) {
   const json = post.toJSON();
@@ -105,5 +118,19 @@ export async function registerPostRoutes(app: FastifyInstance, _opts: FastifyPlu
       posts: feed.posts.map(adaptPost),
       recommendations: feed.recommendations
     };
+  });
+
+  app.get('/trending', async (request) => {
+    const query = TrendingQuerySchema.parse(request.query);
+    const usecase = app.container.resolve<ListTrendingTopicsUseCase>('usecase.post.listTrending');
+    const { topics } = await usecase.execute(query);
+    return { topics };
+  });
+
+  app.post('/upload-url', async (request) => {
+    const payload = UploadUrlSchema.parse(request.body);
+    const usecase = app.container.resolve<GenerateMediaUploadUrlUseCase>('usecase.post.generateUploadUrl');
+    const result = await usecase.execute(payload);
+    return result;
   });
 }

@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 import { User, AuthState } from '../types';
+import { useUserPreferences } from '../state/userPreferences';
 
 type Ctx = AuthState & {
   signUp: (email: string, password: string, userData: Partial<User>) => Promise<{ error: any }>;
@@ -31,6 +32,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const setPreferencesFromProfile = useUserPreferences((state) => state.setFromProfile);
+  const resetPreferences = useUserPreferences((state) => state.reset);
 
   // Lightweight, safe cache of display-only profile fields (not tokens)
   const USER_CACHE_KEY = 'sd_user_cache_v1';
@@ -67,6 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (alive) {
             setSession(null);
             setUser(null);
+            resetPreferences();
             setLoading(false);
           }
           return;
@@ -109,6 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await fetchUserProfile(sess.user.id); // sets loading false in finally
         } else if (event === 'SIGNED_OUT' || !sess) {
           setUser(null);
+          resetPreferences();
           setLoading(false);
         }
       });
@@ -150,15 +155,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             updated_at: new Date().toISOString(),
           } as User;
           setUser(fallbackUser);
+          setPreferencesFromProfile(fallbackUser);
           try { localStorage.setItem(USER_CACHE_KEY, JSON.stringify(fallbackUser)); } catch {}
         } else {
           setUser(null);
+          resetPreferences();
           try { localStorage.removeItem(USER_CACHE_KEY); } catch {}
         }
         return;
       }
 
       setUser(data as User);
+      setPreferencesFromProfile(data as User);
       try { localStorage.setItem(USER_CACHE_KEY, JSON.stringify(data)); } catch {}
     } catch (e: any) {
       console.warn('⚠️ Profile fetch threw (non-fatal):', e?.message ?? e);
@@ -177,9 +185,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           updated_at: new Date().toISOString(),
         } as User;
         setUser(fallbackUser);
+        setPreferencesFromProfile(fallbackUser);
         try { localStorage.setItem(USER_CACHE_KEY, JSON.stringify(fallbackUser)); } catch {}
       } else {
         setUser(null);
+        resetPreferences();
         try { localStorage.removeItem(USER_CACHE_KEY); } catch {}
       }
     } finally {
@@ -261,6 +271,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       setSession(null);
       setLoading(false);
+      resetPreferences();
       try { localStorage.removeItem(USER_CACHE_KEY); } catch {}
     }
   };
@@ -273,7 +284,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .update(updates)
         .eq('id', user.id);
       if (error) return { error };
-      setUser({ ...user, ...updates });
+      const nextUser = { ...user, ...updates } as User;
+      setUser(nextUser);
+      setPreferencesFromProfile(nextUser);
       return { error: null };
     } catch (e) {
       return { error: e };

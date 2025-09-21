@@ -2,9 +2,10 @@ import type { RetrievalQuery, RetrievalResult, KnowledgeNode } from './knowledge
 
 export interface AgentInvocation {
   id: string;
-  agent: 'rag' | 'kag';
+  agent: 'rag' | 'kag' | 'guidance';
   query: string;
   userId?: string;
+  context?: Record<string, unknown>;
 }
 
 export interface AgentResponse {

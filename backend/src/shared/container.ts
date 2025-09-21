@@ -10,6 +10,23 @@ import { CreatePostUseCase } from '../app/use-cases/posts/create-post.js';
 import { ListUserPostsUseCase } from '../app/use-cases/posts/list-user-posts.js';
 import { ListFeedUseCase } from '../app/use-cases/posts/list-feed.js';
 import { AskAgentUseCase } from '../app/use-cases/ai/ask-agent.js';
+import { ExperienceService } from './experience.service.js';
+import { getSupabaseClient } from '../infrastructure/persistence/supabase/supabase-client.js';
+import { ListSuggestedConnectionsUseCase } from '../app/use-cases/users/list-suggested-connections.js';
+import { ListTrendingTopicsUseCase } from '../app/use-cases/posts/list-trending-topics.js';
+import { GenerateMediaUploadUrlUseCase } from '../app/use-cases/posts/generate-media-upload-url.js';
+import { GetDailyReadingUseCase } from '../app/use-cases/readings/get-daily-reading.js';
+import { MarkReadingCompleteUseCase } from '../app/use-cases/readings/mark-reading-complete.js';
+import { ListCommunityMembersUseCase } from '../app/use-cases/community/list-community-members.js';
+import { CreateEventUseCase } from '../app/use-cases/events/create-event.js';
+import { ListEventsUseCase } from '../app/use-cases/events/list-events.js';
+import { RsvpEventUseCase } from '../app/use-cases/events/rsvp-event.js';
+import { GenerateEventIcsUseCase } from '../app/use-cases/events/generate-event-ics.js';
+import { GetDevotionPracticesUseCase } from '../app/use-cases/devotion/get-practices.js';
+import { LogDevotionPracticeUseCase } from '../app/use-cases/devotion/log-practice.js';
+import { GetDevotionSummaryUseCase } from '../app/use-cases/devotion/get-summary.js';
+import { FollowUserUseCase } from '../app/use-cases/users/follow-user.js';
+import { UnfollowUserUseCase } from '../app/use-cases/users/unfollow-user.js';
 
 export type ServiceFactory<T> = (container: Container) => Promise<T> | T;
 
@@ -85,10 +102,16 @@ export async function createContainer({ config }: ContainerOptions): Promise<Con
       ? new SupabasePostRepository(config)
       : new InMemoryPostRepository();
   const aiOrchestrator = new InMemoryAiOrchestrator();
+  const supabaseClient =
+    config.supabaseUrl && config.supabaseServiceRoleKey
+      ? getSupabaseClient(config)
+      : undefined;
+  const experienceSvc = new ExperienceService(supabaseClient);
 
   container.register('repo.user', () => userRepository);
   container.register('repo.post', () => postRepository);
   container.register('ai.orchestrator', () => aiOrchestrator);
+  container.register('service.experience', () => experienceSvc);
 
   container.register('usecase.user.register', () => new RegisterUserUseCase(userRepository));
   container.register(
@@ -101,6 +124,57 @@ export async function createContainer({ config }: ContainerOptions): Promise<Con
     () => new ListFeedUseCase(postRepository, aiOrchestrator),
   );
   container.register('usecase.ai.askAgent', () => new AskAgentUseCase(aiOrchestrator));
+  container.register(
+    'usecase.user.listSuggested',
+    () => new ListSuggestedConnectionsUseCase(experienceSvc)
+  );
+  container.register('usecase.user.follow', () => new FollowUserUseCase(experienceSvc));
+  container.register('usecase.user.unfollow', () => new UnfollowUserUseCase(experienceSvc));
+  container.register(
+    'usecase.post.listTrending',
+    () => new ListTrendingTopicsUseCase(experienceSvc)
+  );
+  container.register('usecase.post.generateUploadUrl', () => new GenerateMediaUploadUrlUseCase());
+  container.register(
+    'usecase.reading.getDaily',
+    () => new GetDailyReadingUseCase(experienceSvc)
+  );
+  container.register(
+    'usecase.reading.complete',
+    () => new MarkReadingCompleteUseCase(experienceSvc)
+  );
+  container.register(
+    'usecase.community.listMembers',
+    () => new ListCommunityMembersUseCase(experienceSvc)
+  );
+  container.register(
+    'usecase.event.create',
+    () => new CreateEventUseCase(experienceSvc)
+  );
+  container.register(
+    'usecase.event.list',
+    () => new ListEventsUseCase(experienceSvc)
+  );
+  container.register(
+    'usecase.event.rsvp',
+    () => new RsvpEventUseCase(experienceSvc)
+  );
+  container.register(
+    'usecase.event.generateIcs',
+    () => new GenerateEventIcsUseCase(experienceSvc)
+  );
+  container.register(
+    'usecase.devotion.listPractices',
+    () => new GetDevotionPracticesUseCase(experienceSvc)
+  );
+  container.register(
+    'usecase.devotion.logPractice',
+    () => new LogDevotionPracticeUseCase(experienceSvc)
+  );
+  container.register(
+    'usecase.devotion.getSummary',
+    () => new GetDevotionSummaryUseCase(experienceSvc)
+  );
 
   // Placeholder providers (database, cache, vector store) to be overridden later
   container.register('db.connection', () => {

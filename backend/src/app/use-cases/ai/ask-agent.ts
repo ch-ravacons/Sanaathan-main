@@ -3,9 +3,10 @@ import { randomUUID } from 'node:crypto';
 import type { AiOrchestrator, AgentInvocation, AgentResponse } from '../../../domain/ai/orchestrator.js';
 
 export interface AskAgentInput {
-  agent: 'rag' | 'kag';
+  agent: 'rag' | 'kag' | 'guidance';
   query: string;
   userId?: string;
+  context?: Record<string, unknown>;
 }
 
 export class AskAgentUseCase {
@@ -16,7 +17,8 @@ export class AskAgentUseCase {
       id: randomUUID(),
       agent: input.agent,
       query: input.query,
-      userId: input.userId
+      userId: input.userId,
+      context: input.context
     };
 
     return this.orchestrator.executeAgent(invocation);

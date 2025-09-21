@@ -1,11 +1,14 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useMemo } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { BookOpen, Users, Calendar, Heart, Check, UserPlus, MapPin, CalendarClock } from 'lucide-react';
+
 import { Header } from '../layout/Header';
 import { Welcome } from './Welcome';
 import { PostFeed } from '../posts/PostFeed';
-import { BookOpen, Users, Calendar, Heart } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { User } from '../../types';
+import { useToast } from '../ui/Toast';
+import { api, queryKeys, type SuggestedConnection, type TrendingTopic, type EventItem } from '../../lib/api';
+import { useUserPreferences } from '../../state/userPreferences';
 
 interface DashboardProps {
   onNavigate: (page: 'dashboard' | 'profile') => void;
@@ -13,187 +16,235 @@ interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const { user } = useAuth();
-  const hasSupabase = Boolean(supabase);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { interests, spiritualPath } = useUserPreferences();
 
-  // Quick Actions (defaults shown until DB returns)
-  const [dailyReading, setDailyReading] = useState('Bhagavad Gita Chapter 4');
-  const [communityStats, setCommunityStats] = useState('0 members');
-  const [nextEvent, setNextEvent] = useState('No upcoming events');
-  const [devotionStats, setDevotionStats] = useState('Daily practice tracker');
+  const preferredPath = spiritualPath ?? user?.spiritual_path ?? null;
+  const primaryInterest = interests[0] ?? user?.interests?.[0] ?? null;
 
-  const [trendingTopics, setTrendingTopics] = useState<{
-    topic: string;
-    count: number;
-  }[]>([]);
+  const dailyReadingQuery = useQuery({
+    queryKey: queryKeys.dailyReading(preferredPath),
+    queryFn: () => api.getDailyReading({ path: preferredPath }),
+    staleTime: 1000 * 60 * 10
+  });
 
-  const [suggestedConnections, setSuggestedConnections] = useState<
-    Pick<User, 'id' | 'full_name' | 'spiritual_path'>[]
-  >([]);
+  const trendingQuery = useQuery({
+    queryKey: queryKeys.trending('24h'),
+    queryFn: () => api.getTrendingTopics({ window: '24h', limit: 5 })
+  });
 
-  const fetchQuickStats = useCallback(async () => {
-    if (!supabase) return;
-    try {
-      // Daily Reading (today or most recent past)
-      try {
-        const today = new Date().toISOString().slice(0, 10);
-        const { data: reading } = await supabase
-          .from('daily_readings')
-          .select('title, reference, reading_date')
-          .lte('reading_date', today)
-          .order('reading_date', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (reading?.title) {
-          setDailyReading(reading.reference ? `${reading.title} ${reading.reference}` : reading.title);
-        }
-      } catch {}
+  const suggestionsQuery = useQuery({
+    queryKey: queryKeys.suggestions(user?.id ?? null),
+    queryFn: () => api.getSuggestedConnections({ userId: user?.id ?? undefined, limit: 5 }),
+    enabled: Boolean(user?.id),
+    staleTime: 1000 * 60 * 5
+  });
 
-      const { count: userCount } = await supabase
-        .from('users')
-        .select('*', { count: 'exact', head: true });
-      if (typeof userCount === 'number') {
-        setCommunityStats(`${userCount} members`);
-      }
+  const communityQuery = useQuery({
+    queryKey: queryKeys.community(primaryInterest),
+    queryFn: () => api.getCommunityMembers({ interest: primaryInterest ?? undefined, limit: 5 })
+  });
 
-      const { data: event } = await supabase
-        .from('events')
-        .select('title')
-        .gte('start_time', new Date().toISOString())
-        .order('start_time', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      if (event?.title) {
-        setNextEvent(event.title);
-      }
-    } catch (error) {
-      console.error('Error fetching quick stats:', error);
-    }
-  }, []);
+  const eventFilters = useMemo(
+    () => ({
+      interest: primaryInterest ?? undefined,
+      startAfter: undefined,
+      attending: undefined,
+      userId: user?.id ?? undefined
+    }),
+    [primaryInterest, user?.id]
+  );
 
-  const fetchTrending = useCallback(async () => {
-    if (!supabase) return;
-    try {
-      const { data, error } = await supabase.from('posts').select('tags');
-      if (error) throw error;
-      const counts: Record<string, number> = {};
-      (data || []).forEach((p: any) => {
-        (p.tags || []).forEach((tag: string) => {
-          counts[tag] = (counts[tag] || 0) + 1;
+  const eventsQuery = useQuery({
+    queryKey: queryKeys.events(eventFilters),
+    queryFn: () =>
+      api.listEvents({
+        interest: primaryInterest ?? undefined,
+        userId: user?.id ?? undefined
+      })
+  });
+
+  const devotionSummaryQuery = useQuery({
+    queryKey: queryKeys.devotion.summary(user?.id ?? null),
+    queryFn: () => api.getDevotionSummary({ userId: user!.id }),
+    enabled: Boolean(user?.id),
+    retry: 0
+  });
+
+  const quickActions = useMemo(() => {
+    const readingTitle = dailyReadingQuery.isLoading
+      ? 'Loading daily reading…'
+      : dailyReadingQuery.data?.reading?.title ?? 'Explore scripture library';
+
+    const communityDescription = communityQuery.isLoading
+      ? 'Connecting seekers…'
+      : communityQuery.data?.members?.length
+        ? `${communityQuery.data.members.length} seekers${primaryInterest ? ` • ${primaryInterest}` : ''}`
+        : primaryInterest
+          ? `Discover ${primaryInterest} circles`
+          : 'Connect with seekers';
+
+    const nextEvent = eventsQuery.isLoading
+      ? 'Loading upcoming events…'
+      : eventsQuery.data?.events?.[0]?.title ?? 'No upcoming events yet';
+
+    const devotionSummary = !user
+      ? 'Sign in to track devotion'
+      : devotionSummaryQuery.isLoading
+        ? 'Syncing your practice…'
+        : devotionSummaryQuery.data?.summary
+          ? `${devotionSummaryQuery.data.summary.total_points} pts • ${devotionSummaryQuery.data.summary.streak} day streak`
+          : 'Log a practice to start your streak';
+
+    return [
+      { icon: BookOpen, label: 'Daily Reading', description: readingTitle },
+      { icon: Users, label: 'Community', description: communityDescription },
+      { icon: Calendar, label: 'Events', description: nextEvent },
+      { icon: Heart, label: 'Devotion', description: devotionSummary }
+    ];
+  }, [
+    dailyReadingQuery.isLoading,
+    dailyReadingQuery.data?.reading?.title,
+    communityQuery.isLoading,
+    communityQuery.data?.members,
+    primaryInterest,
+    eventsQuery.isLoading,
+    eventsQuery.data?.events,
+    user,
+    devotionSummaryQuery.isLoading,
+    devotionSummaryQuery.data?.summary
+  ]);
+
+  const trendingTopics: TrendingTopic[] = trendingQuery.data?.topics ?? [];
+  const suggestedConnections: SuggestedConnection[] = suggestionsQuery.data?.suggestions ?? [];
+  const events: EventItem[] = eventsQuery.data?.events ?? [];
+
+  const followMutation = useMutation({
+    mutationFn: (input: { followerId: string; followeeId: string }) => api.followUser(input),
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.suggestions(user?.id ?? null) });
+      const previous = queryClient.getQueryData<{ suggestions: SuggestedConnection[] }>(queryKeys.suggestions(user?.id ?? null));
+      if (previous) {
+        queryClient.setQueryData(queryKeys.suggestions(user?.id ?? null), {
+          suggestions: previous.suggestions.map((item) =>
+            item.id === variables.followeeId ? { ...item, is_following: true } : item
+          )
         });
-      });
-      const topics = Object.entries(counts)
-        .map(([topic, count]) => ({ topic, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 4);
-      setTrendingTopics(topics);
-    } catch (error) {
-      console.error('Error fetching trending topics:', error);
-    }
-  }, []);
-
-  const fetchSuggestions = useCallback(async () => {
-    if (!supabase || !user) return;
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, full_name, spiritual_path, interests')
-        .neq('id', user.id)
-        .limit(5);
-      if (error) throw error;
-      if (data) {
-        const userInterests = new Set(user.interests || []);
-        const sorted = data
-          .map((u: any) => u)
-          .sort((a: any, b: any) => {
-            const aMatches = (a.interests || []).filter((i: string) =>
-              userInterests.has(i)
-            ).length;
-            const bMatches = (b.interests || []).filter((i: string) =>
-              userInterests.has(i)
-            ).length;
-            return bMatches - aMatches;
-          })
-          .slice(0, 5)
-          .map((u: any) => ({
-            id: u.id,
-            full_name: u.full_name,
-            spiritual_path: u.spiritual_path,
-          }));
-        setSuggestedConnections(sorted);
       }
-    } catch (error) {
-      console.error('Error fetching suggested connections:', error);
-    }
-  }, [user]);
-
-  const fetchDevotion = useCallback(async () => {
-    if (!supabase) return;
-    try {
-      if (!user) {
-        setDevotionStats('Daily practice tracker');
-        return;
+      return { previous };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKeys.suggestions(user?.id ?? null), context.previous);
       }
-      const { data, error } = await supabase
-        .from('practice_logs')
-        .select('practiced_on')
-        .eq('user_id', user.id)
-        .order('practiced_on', { ascending: false })
-        .limit(30);
-      if (error) throw error;
+      toast('Unable to follow right now. Please try again later.', 'error');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.suggestions(user?.id ?? null) });
+    }
+  });
 
-      const days = (data || []).map((r: any) => r.practiced_on);
-      if (!days.length) {
-        setDevotionStats('No practice logged yet');
-        return;
+  const unfollowMutation = useMutation({
+    mutationFn: (input: { followerId: string; followeeId: string }) => api.unfollowUser(input),
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.suggestions(user?.id ?? null) });
+      const previous = queryClient.getQueryData<{ suggestions: SuggestedConnection[] }>(queryKeys.suggestions(user?.id ?? null));
+      if (previous) {
+        queryClient.setQueryData(queryKeys.suggestions(user?.id ?? null), {
+          suggestions: previous.suggestions.map((item) =>
+            item.id === variables.followeeId ? { ...item, is_following: false } : item
+          )
+        });
       }
-      const toKey = (d: Date) => d.toISOString().slice(0, 10);
-      const set = new Set(days);
-      let streak = 0;
-      let cur = new Date();
-      if (!set.has(toKey(cur))) cur.setDate(cur.getDate() - 1);
-      while (set.has(toKey(cur))) { streak += 1; cur.setDate(cur.getDate() - 1); }
-      setDevotionStats(streak > 0 ? `${streak}-day streak` : 'No practice today');
-    } catch (e) {
-      console.error('Error fetching devotion stats:', e);
+      return { previous };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKeys.suggestions(user?.id ?? null), context.previous);
+      }
+      toast('Unable to update follow status.', 'error');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.suggestions(user?.id ?? null) });
     }
-  }, [user]);
+  });
 
-  useEffect(() => {
-    if (hasSupabase) {
-      fetchQuickStats();
-      fetchTrending();
-      fetchSuggestions();
-      fetchDevotion();
+  const rsvpMutation = useMutation({
+    mutationFn: (input: { eventId: string; status: 'going' | 'interested' | 'not_going' }) => {
+      if (!user?.id) {
+        return Promise.reject(new Error('Sign in required'));
+      }
+      return api.rsvpEvent({ eventId: input.eventId, status: input.status, userId: user.id });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.events(eventFilters) });
+      toast('Event RSVP updated', 'success');
+    },
+    onError: () => toast('Unable to update RSVP. Try again later.', 'error')
+  });
+
+  const markReadingMutation = useMutation({
+    mutationFn: () => {
+      if (!user?.id || !dailyReadingQuery.data?.reading?.id) {
+        return Promise.reject(new Error('Missing user or reading'));
+      }
+      return api.markReadingComplete({ readingId: dailyReadingQuery.data.reading.id, userId: user.id });
+    },
+    onSuccess: () => {
+      toast('Reading marked as complete 🙏', 'success');
+      queryClient.invalidateQueries({ queryKey: queryKeys.dailyReading(preferredPath) });
+    },
+    onError: () => toast('Unable to mark reading complete right now.', 'error')
+  });
+
+  const handleToggleFollow = (connection: SuggestedConnection) => {
+    if (!user?.id) {
+      toast('Sign in to manage followers', 'info');
+      return;
     }
-  }, [hasSupabase, fetchQuickStats, fetchTrending, fetchSuggestions, fetchDevotion]);
 
-  const quickActions = [
-    { icon: BookOpen, label: 'Daily Reading', description: dailyReading },
-    { icon: Users, label: 'Community', description: communityStats },
-    { icon: Calendar, label: 'Events', description: nextEvent },
-    { icon: Heart, label: 'Devotion', description: devotionStats },
-  ];
+    if (connection.is_following) {
+      unfollowMutation.mutate({ followerId: user.id, followeeId: connection.id });
+    } else {
+      followMutation.mutate({ followerId: user.id, followeeId: connection.id });
+    }
+  };
+
+  const handleRsvp = (eventId: string, status: 'going' | 'interested') => {
+    if (!user?.id) {
+      toast('Sign in to RSVP to events', 'info');
+      return;
+    }
+    rsvpMutation.mutate({ eventId, status });
+  };
+
+  const handleMarkReadingComplete = () => {
+    if (!user?.id) {
+      toast('Sign in to track your readings', 'info');
+      return;
+    }
+    markReadingMutation.mutate();
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Header onProfile={() => onNavigate('profile')} />
-      
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Welcome />
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Main Content */}
           <div className="lg:col-span-3">
-            {/* Quick Actions */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
               {quickActions.map((action) => (
                 <div
                   key={action.label}
-                  className="bg-white rounded-lg p-4 shadow-sm border border-gray-200 hover:shadow-md transition-shadow cursor-pointer"
+                  className="bg-white rounded-lg p-4 shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
                 >
                   <action.icon className="w-8 h-8 text-orange-600 mb-2" />
                   <h3 className="font-semibold text-gray-900">{action.label}</h3>
-                  <p className="text-sm text-gray-500">{action.description}</p>
+                  <p className="text-sm text-gray-500 line-clamp-3">{action.description}</p>
                 </div>
               ))}
             </div>
@@ -201,23 +252,56 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             <PostFeed />
           </div>
 
-          {/* Sidebar */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="lg:col-span-1 space-y-6">
+            {dailyReadingQuery.data?.reading && (
+              <div className="bg-gradient-to-br from-orange-50 to-white border border-orange-100 rounded-lg shadow-sm p-6">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-1 flex items-center gap-2">
+                      <BookOpen className="w-5 h-5 text-orange-600" /> Daily Reading
+                    </h3>
+                    <p className="text-sm font-medium text-gray-800">{dailyReadingQuery.data.reading.title}</p>
+                    {dailyReadingQuery.data.reading.summary && (
+                      <p className="text-sm text-gray-600 mt-2 line-clamp-4">
+                        {dailyReadingQuery.data.reading.summary}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-4 flex items-center justify-between">
+                  <span className="text-xs text-gray-500">
+                    Path: {dailyReadingQuery.data.reading.path.toUpperCase()}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleMarkReadingComplete}
+                    disabled={markReadingMutation.isPending}
+                    className="inline-flex items-center gap-2 text-xs font-medium text-orange-600 hover:text-orange-700"
+                  >
+                    <Check className="w-4 h-4" />
+                    {markReadingMutation.isPending ? 'Saving…' : 'Mark as complete'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h3 className="font-semibold text-gray-900 mb-4">Trending Topics</h3>
               <div className="space-y-3">
-                {trendingTopics.length === 0 && (
+                {trendingQuery.isLoading && (
+                  <div className="space-y-2">
+                    {[1, 2, 3].map((item) => (
+                      <div key={item} className="h-4 bg-gray-100 animate-pulse rounded" />
+                    ))}
+                  </div>
+                )}
+                {!trendingQuery.isLoading && trendingTopics.length === 0 && (
                   <div className="text-sm text-gray-500">No trending topics yet</div>
                 )}
                 {trendingTopics.map((topic) => (
-                  <div
-                    key={topic.topic}
-                    className="flex items-center justify-between"
-                  >
+                  <div key={topic.topic} className="flex items-center justify-between">
                     <span className="text-sm text-gray-700">#{topic.topic}</span>
-                    <span className="text-xs text-gray-500">
-                      {topic.count} posts
-                    </span>
+                    <span className="text-xs text-gray-500">{topic.post_count} posts</span>
                   </div>
                 ))}
               </div>
@@ -226,30 +310,145 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h3 className="font-semibold text-gray-900 mb-4">Suggested Connections</h3>
               <div className="space-y-4">
-                {suggestedConnections.length === 0 && (
+                {suggestionsQuery.isLoading && (
+                  <div className="space-y-4">
+                    {[1, 2, 3].map((item) => (
+                      <div key={item} className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-gray-100 rounded-full animate-pulse" />
+                          <div className="space-y-2">
+                            <div className="w-24 h-3 bg-gray-100 rounded" />
+                            <div className="w-16 h-3 bg-gray-100 rounded" />
+                          </div>
+                        </div>
+                        <div className="w-16 h-6 bg-gray-100 rounded" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {!suggestionsQuery.isLoading && !user && (
+                  <div className="text-sm text-gray-500">Sign in to receive personalized suggestions.</div>
+                )}
+                {suggestionsQuery.isError && (
+                  <div className="text-sm text-red-500">Unable to load suggestions right now.</div>
+                )}
+                {!suggestionsQuery.isLoading && user && suggestedConnections.length === 0 && !suggestionsQuery.isError && (
                   <div className="text-sm text-gray-500">No suggestions yet</div>
                 )}
-                {suggestedConnections.map((connection) => (
-                  <div
-                    key={connection.id}
-                    className="flex items-center justify-between"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center text-white text-sm font-semibold">
-                        {connection.full_name.charAt(0)}
+                {suggestedConnections.map((connection) => {
+                  const isFollowPending =
+                    (followMutation.isPending && followMutation.variables?.followeeId === connection.id) ||
+                    (unfollowMutation.isPending && unfollowMutation.variables?.followeeId === connection.id);
+                  return (
+                    <div key={connection.id} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+                          {connection.full_name?.charAt(0) ?? 'S'}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{connection.full_name}</p>
+                          <p className="text-xs text-gray-500">{connection.spiritual_path ?? 'Spiritual seeker'}</p>
+                        </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleFollow(connection)}
+                        disabled={isFollowPending}
+                        className={`text-xs font-medium flex items-center gap-2 ${
+                          connection.is_following ? 'text-gray-500 hover:text-gray-600' : 'text-orange-600 hover:text-orange-700'
+                        }`}
+                      >
+                        {connection.is_following ? (
+                          <>
+                            <Check className="w-3 h-3" /> Following
+                          </>
+                        ) : (
+                          <>
+                            <UserPlus className="w-3 h-3" /> Follow
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <CalendarClock className="w-5 h-5 text-orange-600" /> Upcoming Events
+              </h3>
+              <div className="space-y-4">
+                {eventsQuery.isLoading && (
+                  <div className="space-y-3">
+                    {[1, 2].map((item) => (
+                      <div key={item} className="h-16 bg-gray-100 rounded animate-pulse" />
+                    ))}
+                  </div>
+                )}
+                {!eventsQuery.isLoading && events.length === 0 && (
+                  <p className="text-sm text-gray-500">No events scheduled. Create one to uplift the community!</p>
+                )}
+                {events.slice(0, 4).map((event) => (
+                  <div key={event.id} className="border border-gray-100 rounded-md p-3">
+                    <div className="flex items-start justify-between">
                       <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          {connection.full_name}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {connection.spiritual_path}
-                        </p>
+                        <p className="text-sm font-semibold text-gray-900">{event.title}</p>
+                        {event.location && (
+                          <p className="text-xs text-gray-500 flex items-center gap-1">
+                            <MapPin className="w-3 h-3" /> {event.location}
+                          </p>
+                        )}
+                        <p className="text-xs text-gray-500">Attending: {event.attendees_count}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleRsvp(event.id, 'going')}
+                          disabled={rsvpMutation.isPending}
+                          className={`text-xs font-medium px-2 py-1 rounded ${
+                            event.is_attending
+                              ? 'bg-orange-100 text-orange-700'
+                              : 'bg-orange-50 text-orange-600 hover:bg-orange-100'
+                          }`}
+                        >
+                          Going
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRsvp(event.id, 'interested')}
+                          disabled={rsvpMutation.isPending}
+                          className="text-xs text-gray-500 border border-gray-200 px-2 py-1 rounded hover:border-gray-300"
+                        >
+                          Interested
+                        </button>
                       </div>
                     </div>
-                    <button className="text-xs text-orange-600 hover:text-orange-700 font-medium">
-                      Follow
-                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h3 className="font-semibold text-gray-900 mb-4">Community Members</h3>
+              <div className="space-y-3">
+                {communityQuery.isLoading && (
+                  <div className="space-y-2">
+                    {[1, 2, 3].map((item) => (
+                      <div key={item} className="h-12 bg-gray-100 rounded animate-pulse" />
+                    ))}
+                  </div>
+                )}
+                {!communityQuery.isLoading && communityQuery.data?.members?.length === 0 && (
+                  <p className="text-sm text-gray-500">No members found for this interest yet.</p>
+                )}
+                {communityQuery.data?.members?.slice(0, 5).map((member) => (
+                  <div key={member.id} className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{member.full_name}</p>
+                      <p className="text-xs text-gray-500">{member.spiritual_path ?? 'Seeker'}</p>
+                    </div>
+                    {member.location && <span className="text-xs text-gray-400">{member.location}</span>}
                   </div>
                 ))}
               </div>
