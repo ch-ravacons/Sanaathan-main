@@ -1,195 +1,85 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+
 import { PostCard } from './PostCard';
 import { CreatePost } from './CreatePost';
 import { Post } from '../../types';
-import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../ui/Toast';
+import { api } from '../../lib/api';
 
 export const PostFeed: React.FC = () => {
-  const { user, session, loading: authLoading } = useAuth();
+  const { user, session } = useAuth();
   const { toast } = useToast();
-  const hasSupabase = Boolean(supabase);
-  const [posts, setPosts] = useState<Post[]>(hasSupabase ? [] : samplePosts);
-  const [loading, setLoading] = useState<boolean>(hasSupabase);
-  const [usingSample, setUsingSample] = useState<boolean>(!hasSupabase);
+  const [posts, setPosts] = useState<Post[]>(samplePosts);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [usingSample, setUsingSample] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<'all' | 'mine'>('all');
-  const publicFetchedOnce = useRef(false);
 
   const interestsKey = user?.interests?.join(',') || '';
-  // Prefer profile id; fall back to auth session id in case profile hasn't loaded yet
   const effectiveUserId = user?.id || session?.user?.id || null;
 
-  const authLoadingRef = useRef(authLoading);
-  const activeTabRef = useRef(activeTab);
-  const effectiveUserIdRef = useRef(effectiveUserId);
-
   const fetchPosts = useCallback(async () => {
+    if (activeTab === 'mine' && !effectiveUserId) {
+      setPosts([]);
+      setUsingSample(false);
+      setLoading(false);
+      toast('Sign in to view your posts.', 'info');
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      if (!supabase) {
-        setLoading(false);
-        return;
-      }
-
-      // Build query based on tab
-      let query;
-
-      if (activeTab === 'mine') {
-        if (!effectiveUserId) {
-          setPosts([]);
-          setUsingSample(false);
-          toast('Sign in to view your posts.', 'info');
-          return;
-        }
-        // For 'My Posts', we don't need the users join; use local profile for display
-        query = supabase
-          .from('posts')
-          .select('*')
-          .eq('user_id', effectiveUserId);
-      } else {
-        // All posts: show approved for everyone; include my own if signed in
-        query = supabase
-          .from('posts')
-          .select(`
-            *,
-            users(*)
-          `)
-          // Fetch approved posts first; we'll merge in my posts explicitly below to avoid OR quirks with UUIDs
-          .eq('moderation_status', 'approved');
-      }
-
-      const { data, error } = await query
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      if (error) throw error;
-
-      // Map user for rendering
-      let transformedPosts: Post[] = (data ?? []).map((post: any) => {
-        if (activeTab === 'mine') {
-          // Use local user context for display to avoid depending on users join
-          return { ...post, user: user || undefined } as Post;
-        }
-        return { ...post, user: post.users } as Post;
+      const response = await api.listPosts({
+        userId: effectiveUserId ?? undefined,
+        interests: interestsKey ? interestsKey.split(',').filter(Boolean) : undefined,
+        limit: 20,
+        mine: activeTab === 'mine'
       });
 
-      if (activeTab === 'all' && effectiveUserId) {
-        const { data: myPostsData, error: myPostsError } = await supabase
-          .from('posts')
-          .select(`
-            *,
-            users(*)
-          `)
-          .eq('user_id', effectiveUserId)
-          .order('created_at', { ascending: false })
-          .limit(20);
+      const normalized: Post[] = (response.posts ?? []).map((post: any) => ({
+        ...post,
+        user: post.user ?? post.author ?? undefined,
+        created_at: post.created_at ?? post.createdAt,
+        updated_at: post.updated_at ?? post.updatedAt,
+        tags: Array.isArray(post.tags) ? post.tags : []
+      }));
 
-        if (!myPostsError && myPostsData) {
-          const merged = new Map<string, Post>();
-          transformedPosts.forEach((post) => merged.set(post.id, post));
+      let transformedPosts = normalized;
 
-          myPostsData.forEach((post: any) => {
-            merged.set(post.id, { ...post, user: post.users || user || undefined } as Post);
-          });
-
-          transformedPosts = Array.from(merged.values()).sort(
-            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          );
-        }
-      }
-
-      // Optional interests-based prioritization
-      if (interestsKey) {
+      if (interestsKey && normalized.length) {
         const interestSet = new Set(interestsKey.split(',').map((s) => s.trim()).filter(Boolean));
-        const preferred = transformedPosts.filter((p: any) => {
-          const topicMatch = p.spiritual_topic && interestSet.has(p.spiritual_topic);
+        const preferred = normalized.filter((p: any) => {
+          const topicMatch = (p.spiritual_topic || p.spiritualTopic) && interestSet.has(p.spiritual_topic || p.spiritualTopic);
           const tagMatch = Array.isArray(p.tags) && p.tags.some((t: string) => interestSet.has(t));
           return topicMatch || tagMatch;
         });
-        const others = transformedPosts.filter((p) => !preferred.includes(p));
+        const others = normalized.filter((p) => !preferred.includes(p));
         transformedPosts = [...preferred, ...others];
       }
 
-      if (transformedPosts.length) {
-        setPosts(transformedPosts);
-        setUsingSample(false);
-      } else {
-        // No live posts yet; show empty state (not sample data)
-        setPosts([]);
-        setUsingSample(false);
-      }
-    } catch (err) {
-      console.error('Error fetching posts:', err);
+      setPosts(transformedPosts);
+      setUsingSample(false);
+    } catch (error) {
+      console.error('Error fetching posts:', error);
       setPosts(samplePosts);
       setUsingSample(true);
     } finally {
       setLoading(false);
     }
-  }, [interestsKey, effectiveUserId, activeTab]);
-
-  // Fast public fetch: on initial load, fetch approved posts immediately
-  // so the network call happens even if the session is still restoring.
-  useEffect(() => {
-    authLoadingRef.current = authLoading;
-    activeTabRef.current = activeTab;
-    effectiveUserIdRef.current = effectiveUserId;
-  }, [authLoading, activeTab, effectiveUserId]);
-
-  const fetchPublicApproved = useCallback(async () => {
-    try {
-      if (!supabase) return;
-      const { data, error } = await supabase
-        .from('posts')
-        .select(`
-          *,
-          users(*)
-        `)
-        .eq('moderation_status', 'approved')
-        .order('created_at', { ascending: false })
-        .limit(20);
-      if (error) throw error;
-      const transformed: Post[] = (data ?? []).map((p: any) => ({ ...p, user: p.users }));
-
-      if (effectiveUserIdRef.current || activeTabRef.current !== 'all') {
-        return;
-      }
-
-      setPosts(transformed);
-      setUsingSample(false);
-    } catch (err) {
-      console.error('Error fetching public posts:', err);
-      setUsingSample(true);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  }, [activeTab, effectiveUserId, interestsKey, toast]);
 
   useEffect(() => {
-    if (!hasSupabase) return;
-    if (authLoading) {
-      // While session restores, perform a one-time public fetch for All tab
-      if (activeTab === 'all' && !publicFetchedOnce.current) {
-        publicFetchedOnce.current = true;
-        fetchPublicApproved();
-      }
-      return;
-    }
     fetchPosts();
+  }, [fetchPosts]);
 
-    const timeout = setTimeout(() => {
-      setLoading(false);
-    }, 4000);
-
-    return () => clearTimeout(timeout);
-  }, [hasSupabase, authLoading, session?.user?.id, effectiveUserId, activeTab, fetchPosts, fetchPublicApproved]);
-
-  const handlePostCreated = () => {
+  const handlePostCreated = useCallback(() => {
     fetchPosts();
-  };
+  }, [fetchPosts]);
 
-  const handlePostUpdate = () => {
+  const handlePostUpdate = useCallback(() => {
     fetchPosts();
-  };
+  }, [fetchPosts]);
 
   if (loading) {
     return (
@@ -217,7 +107,6 @@ export const PostFeed: React.FC = () => {
     <div>
       <CreatePost onPostCreated={handlePostCreated} />
 
-      {/* Tabs */}
       <div className="mb-4">
         <div className="inline-flex bg-gray-100 rounded-lg p-1">
           <button
@@ -242,7 +131,7 @@ export const PostFeed: React.FC = () => {
 
       {usingSample && (
         <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded">
-          Showing sample posts (live data unavailable). Check Supabase config or network.
+          Showing sample posts (live data unavailable). Check API connectivity or backend status.
         </div>
       )}
 
