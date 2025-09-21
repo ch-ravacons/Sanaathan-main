@@ -35,6 +35,14 @@ export interface AuthState {
   loading: boolean;
 }
 
+export interface PostMedia {
+  id: string;
+  url: string;
+  media_type: 'image' | 'video';
+  metadata?: Record<string, unknown> | null;
+  storage_bucket?: string | null;
+}
+
 export interface Post {
   id: string;
   user_id: string;
@@ -49,6 +57,7 @@ export interface Post {
   created_at: string;
   updated_at: string;
   user?: User;
+  media?: PostMedia[];
 }
 
 export interface Comment {

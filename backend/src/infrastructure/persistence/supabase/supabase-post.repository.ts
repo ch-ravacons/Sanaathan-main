@@ -23,9 +23,28 @@ interface PostRow {
     spiritual_name?: string | null;
     spiritual_path?: string | null;
   } | null;
+  post_media?: Array<{
+    id: string;
+    media_type: string | null;
+    metadata: Record<string, unknown> | null;
+    media_uploads?: {
+      id?: string;
+      url: string | null;
+      storage_bucket: string | null;
+      metadata: Record<string, unknown> | null;
+    } | null;
+  }> | null;
 }
 
 function mapRow(row: PostRow): Post {
+  const media = (row.post_media ?? []).map((item) => ({
+    id: item.id,
+    url: item.media_uploads?.url ?? '',
+    mediaType: (item.media_type ?? 'image') as 'image' | 'video',
+    metadata: item.metadata ?? item.media_uploads?.metadata ?? null,
+    storageBucket: item.media_uploads?.storage_bucket ?? null
+  }));
+
   return new Post({
     id: row.id,
     userId: row.user_id,
@@ -46,7 +65,8 @@ function mapRow(row: PostRow): Post {
           spiritualName: row.users.spiritual_name ?? null,
           spiritualPath: row.users.spiritual_path ?? null
         }
-      : undefined
+      : undefined,
+    media
   });
 }
 
@@ -68,10 +88,35 @@ export class SupabasePostRepository implements PostRepository {
         tags: input.tags ?? [],
         moderation_status: input.moderationStatus ?? 'pending'
       })
-      .select(`*, users(id, email, full_name, spiritual_name, spiritual_path)`).single<PostRow>();
+      .select(`*, users(id, email, full_name, spiritual_name, spiritual_path), post_media(id, media_type, metadata, media_uploads(url, storage_bucket, metadata))`)
+      .single<PostRow>();
 
     if (error || !data) {
       throw new Error(`Failed to insert post: ${error?.message ?? 'unknown error'}`);
+    }
+
+    if (input.media?.length) {
+      const rows = input.media.map((item) => ({
+        post_id: input.id,
+        media_id: item.assetId,
+        media_type: item.type,
+        metadata: item.metadata ?? {}
+      }));
+
+      const { error: mediaError } = await this.client.from('post_media').upsert(rows);
+      if (mediaError) {
+        throw new Error(`Failed to attach media to post: ${mediaError.message}`);
+      }
+
+      const { data: refreshed, error: refreshError } = await this.client
+        .from('posts')
+        .select(`*, users(id, email, full_name, spiritual_name, spiritual_path), post_media(id, media_type, metadata, media_uploads(url, storage_bucket, metadata))`)
+        .eq('id', input.id)
+        .single<PostRow>();
+
+      if (!refreshError && refreshed) {
+        return mapRow(refreshed);
+      }
     }
 
     return mapRow(data);
@@ -80,7 +125,7 @@ export class SupabasePostRepository implements PostRepository {
   async listRecentByUser(userId: string, limit: number): Promise<Post[]> {
     const { data, error } = await this.client
       .from('posts')
-      .select(`*, users(id, email, full_name, spiritual_name, spiritual_path)`)
+      .select(`*, users(id, email, full_name, spiritual_name, spiritual_path), post_media(id, media_type, metadata, media_uploads(url, storage_bucket, metadata))`)
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(limit);
@@ -95,7 +140,7 @@ export class SupabasePostRepository implements PostRepository {
   async listPublicFeed(limit: number): Promise<Post[]> {
     const { data, error } = await this.client
       .from('posts')
-      .select(`*, users(id, email, full_name, spiritual_name, spiritual_path)`)
+      .select(`*, users(id, email, full_name, spiritual_name, spiritual_path), post_media(id, media_type, metadata, media_uploads(url, storage_bucket, metadata))`)
       .eq('moderation_status', 'approved')
       .order('created_at', { ascending: false })
       .limit(limit);

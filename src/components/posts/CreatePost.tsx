@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Send, AlertCircle, CheckCircle, Lightbulb } from 'lucide-react';
+import React, { useState, useCallback, useMemo } from 'react';
+import { Send, AlertCircle, CheckCircle, Lightbulb, Paperclip, XCircle } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Select } from '../ui/Select';
 import { spiritualTopics } from '../../data/spiritualTopics';
@@ -12,6 +12,13 @@ interface CreatePostProps {
   onPostCreated: () => void;
 }
 
+interface Attachment {
+  file: File;
+  preview: string;
+}
+
+const MAX_ATTACHMENTS = 3;
+
 export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
   const { user, session } = useAuth();
   const { toast } = useToast();
@@ -21,6 +28,9 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
   const [loading, setLoading] = useState(false);
   const [moderation, setModeration] = useState<any>(null);
   const [showGuidelines, setShowGuidelines] = useState(false);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+
+  const effectiveUserId = user?.id || session?.user?.id || null;
 
   const handleContentChange = (value: string) => {
     setContent(value);
@@ -32,6 +42,43 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
     }
   };
 
+  const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    if (!files.length) return;
+
+    const accepted = files.filter((file) => file.type.startsWith('image/') || file.type.startsWith('video/'));
+    if (accepted.length !== files.length) {
+      toast('Only image and video files are supported.', 'warning');
+    }
+
+    const remainingSlots = MAX_ATTACHMENTS - attachments.length;
+    if (remainingSlots <= 0) {
+      toast(`You can attach up to ${MAX_ATTACHMENTS} files.`, 'info');
+      return;
+    }
+
+    const toAdd = accepted.slice(0, remainingSlots).map((file) => ({
+      file,
+      preview: URL.createObjectURL(file)
+    }));
+
+    if (toAdd.length < accepted.length) {
+      toast(`Only the first ${remainingSlots} file(s) were attached.`, 'info');
+    }
+
+    setAttachments((prev) => [...prev, ...toAdd]);
+    event.target.value = '';
+  }, [attachments.length, toast]);
+
+  const handleRemoveAttachment = useCallback((index: number) => {
+    setAttachments((prev) => {
+      const next = [...prev];
+      const [removed] = next.splice(index, 1);
+      if (removed) URL.revokeObjectURL(removed.preview);
+      return next;
+    });
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!content.trim()) return;
@@ -40,31 +87,69 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
       return;
     }
 
-    const moderationResult = moderateContent(content);
+    if (!effectiveUserId) {
+      toast('You must be signed in to create a post.', 'warning');
+      return;
+    }
 
+    const moderationResult = moderateContent(content);
     setLoading(true);
 
     try {
       const tagsArray = tags.split(',').map((tag) => tag.trim()).filter(Boolean);
 
-      const effectiveUserId = user?.id || session?.user?.id;
-      if (!effectiveUserId) {
-        toast('You must be signed in to create a post.', 'warning');
-        setLoading(false);
-        return;
+      const mediaPayload: Array<{ assetId: string; type: 'image' | 'video'; metadata?: Record<string, unknown> }> = [];
+
+      for (const attachment of attachments) {
+        const file = attachment.file;
+        const type: 'image' | 'video' = file.type.startsWith('video/') ? 'video' : 'image';
+
+        const uploadInfo = await api.getUploadUrl({
+          userId: effectiveUserId,
+          mediaType: type,
+          fileName: file.name
+        });
+
+        const uploadResponse = await fetch(uploadInfo.uploadUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': file.type,
+            ...(uploadInfo.headers ?? {})
+          },
+          body: file
+        });
+
+        if (!uploadResponse.ok) {
+          throw new Error('Failed to upload media');
+        }
+
+        mediaPayload.push({
+          assetId: uploadInfo.assetId,
+          type,
+          metadata: {
+            originalName: file.name,
+            size: file.size,
+            mimeType: file.type,
+            url: uploadInfo.publicUrl ?? null,
+            path: uploadInfo.path
+          }
+        });
       }
 
       await api.createPost({
         userId: effectiveUserId,
         content: content.trim(),
         spiritualTopic: selectedTopic || null,
-        tags: tagsArray
+        tags: tagsArray,
+        media: mediaPayload
       });
 
       setContent('');
       setSelectedTopic('');
       setTags('');
       setModeration(null);
+      attachments.forEach((item) => URL.revokeObjectURL(item.preview));
+      setAttachments([]);
       onPostCreated();
 
       if (!moderationResult.isAppropriate || moderationResult.score < 5) {
@@ -75,17 +160,15 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
     } catch (error: any) {
       console.error('Error creating post:', error);
       const message = error?.message || String(error);
-      if (message.includes('length') || message.includes('check constraint')) {
-        toast('Message must be between 10 and 1000 characters.', 'warning');
-      } else {
-        toast(`Failed to create post: ${message}`, 'error');
-      }
+      toast(`Failed to create post: ${message}`, 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const suggestions = selectedTopic ? generateContentSuggestions(selectedTopic) : [];
+  const suggestions = useMemo(() => (
+    selectedTopic ? generateContentSuggestions(selectedTopic) : []
+  ), [selectedTopic]);
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
@@ -154,6 +237,47 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
           </div>
         </div>
 
+        <div className="flex items-center justify-between">
+          <label className="flex items-center gap-2 text-sm font-medium text-orange-600 cursor-pointer">
+            <Paperclip className="w-4 h-4" /> Attach media
+            <input
+              type="file"
+              accept="image/*,video/*"
+              multiple
+              className="hidden"
+              onChange={handleFileSelect}
+            />
+          </label>
+          <span className="text-xs text-gray-400">
+            {attachments.length}/{MAX_ATTACHMENTS} attachments
+          </span>
+        </div>
+
+        {attachments.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {attachments.map((attachment, index) => {
+              const isVideo = attachment.file.type.startsWith('video/');
+              return (
+                <div key={`${attachment.preview}-${index}`} className="relative border border-gray-200 rounded-lg overflow-hidden group">
+                  {isVideo ? (
+                    <video src={attachment.preview} className="w-full h-40 object-cover bg-black" controls />
+                  ) : (
+                    <img src={attachment.preview} alt={attachment.file.name} className="w-full h-40 object-cover" />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveAttachment(index)}
+                    className="absolute top-2 right-2 bg-white/80 rounded-full p-1 text-gray-700 hover:text-red-600"
+                    aria-label="Remove attachment"
+                  >
+                    <XCircle className="w-4 h-4" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {suggestions.length > 0 && (
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <h5 className="text-sm font-medium text-blue-900 mb-2">💡 Content Suggestions:</h5>
@@ -180,24 +304,26 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
         </div>
 
         {moderation && (
-          <div className={`p-3 rounded-lg border ${
-            moderation.isAppropriate 
-              ? 'bg-green-50 border-green-200' 
-              : 'bg-red-50 border-red-200'
-          }`}>
+          <div
+            className={`p-3 rounded-lg border ${
+              moderation.isAppropriate ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+            }`}
+          >
             <div className="flex items-center space-x-2 mb-2">
               {moderation.isAppropriate ? (
                 <CheckCircle className="w-4 h-4 text-green-600" />
               ) : (
                 <AlertCircle className="w-4 h-4 text-red-600" />
               )}
-              <span className={`text-sm font-medium ${
-                moderation.isAppropriate ? 'text-green-900' : 'text-red-900'
-              }`}>
+              <span
+                className={`text-sm font-medium ${
+                  moderation.isAppropriate ? 'text-green-900' : 'text-red-900'
+                }`}
+              >
                 Content {moderation.isAppropriate ? 'looks good!' : 'needs review'}
               </span>
             </div>
-            
+
             {moderation.flags.length > 0 && (
               <ul className="text-sm text-red-800 space-y-1 mb-2">
                 {moderation.flags.map((flag: string, index: number) => (
@@ -205,7 +331,7 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
                 ))}
               </ul>
             )}
-            
+
             {moderation.suggestions && (
               <ul className="text-sm text-orange-800 space-y-1">
                 {moderation.suggestions.map((suggestion: string, index: number) => (

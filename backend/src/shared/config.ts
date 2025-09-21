@@ -12,7 +12,8 @@ const ConfigSchema = z.object({
   openAiApiKey: z.string().optional(),
   anthropicApiKey: z.string().optional(),
   supabaseUrl: z.string().url().optional(),
-  supabaseServiceRoleKey: z.string().optional()
+  supabaseServiceRoleKey: z.string().optional(),
+  postMediaBucket: z.string().default('post-media')
 });
 
 export type AppConfig = z.infer<typeof ConfigSchema>;
@@ -31,7 +32,8 @@ export function loadConfig(): AppConfig {
     openAiApiKey: process.env.OPENAI_API_KEY,
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,
     supabaseUrl: process.env.SUPABASE_URL,
-    supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY
+    supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    postMediaBucket: process.env.POST_MEDIA_BUCKET
   });
 
   if (!parsed.success) {

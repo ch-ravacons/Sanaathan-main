@@ -174,7 +174,9 @@ const AgentResponseSchema = z.object({
 const UploadUrlResponseSchema = z.object({
   uploadUrl: z.string().url(),
   assetId: z.string(),
-  headers: z.record(z.string()).optional()
+  headers: z.record(z.string()).optional(),
+  publicUrl: z.string().url().nullable().optional(),
+  path: z.string().optional()
 });
 
 export type ApiPost = z.infer<typeof PostSchema>;

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Heart, MessageCircle, Share2, Flag, MoreHorizontal } from 'lucide-react';
-import { Post } from '../../types';
+import { Heart, MessageCircle, Share2, Flag, MoreHorizontal, ImageOff } from 'lucide-react';
+import { Post, PostMedia } from '../../types';
 import { Button } from '../ui/Button';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -126,6 +126,8 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onUpdate }) => {
     return date.toLocaleDateString();
   };
 
+  const attachments: PostMedia[] = Array.isArray(post.media) ? post.media : [];
+
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-4">
       {/* Header */}
@@ -165,13 +167,43 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onUpdate }) => {
       </div>
 
       {/* Content */}
-      <div className="mb-4">
+      <div className="mb-4 space-y-3">
         <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">
           {post.content}
         </p>
-        
+
+        {attachments.length > 0 && (
+          <div className={`grid gap-3 ${attachments.length > 1 ? 'sm:grid-cols-2' : ''}`}>
+            {attachments.map((media) => {
+              if (!media.url) {
+                return (
+                  <div key={media.id} className="flex items-center justify-center h-48 bg-gray-100 text-gray-400 rounded-lg border border-dashed">
+                    <ImageOff className="w-6 h-6" />
+                  </div>
+                );
+              }
+              return media.media_type === 'video' ? (
+                <video
+                  key={media.id}
+                  className="w-full h-48 rounded-lg border border-gray-200 object-cover bg-black"
+                  controls
+                  src={media.url}
+                />
+              ) : (
+                <img
+                  key={media.id}
+                  src={media.url}
+                  alt={media.metadata?.originalName?.toString() ?? 'Post attachment'}
+                  className="w-full h-48 rounded-lg border border-gray-200 object-cover"
+                  loading="lazy"
+                />
+              );
+            })}
+          </div>
+        )}
+
         {safeTags.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-3">
+          <div className="flex flex-wrap gap-2 mt-1">
             {safeTags.map((tag, index) => (
               <span
                 key={index}

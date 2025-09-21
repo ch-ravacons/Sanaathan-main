@@ -17,6 +17,15 @@ export interface PostProps {
   likesCount?: number;
   commentsCount?: number;
   sharesCount?: number;
+  media?: PostMediaProps[];
+}
+
+export interface PostMediaProps {
+  id: string;
+  url: string;
+  mediaType: 'image' | 'video';
+  metadata?: Record<string, unknown> | null;
+  storageBucket?: string | null;
 }
 
 export class Post {
@@ -60,6 +69,10 @@ export class Post {
 
   get sharesCount() {
     return this.props.sharesCount ?? 0;
+  }
+
+  get media() {
+    return this.props.media ?? [];
   }
 
   toJSON() {

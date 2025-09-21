@@ -7,6 +7,11 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../ui/Toast';
 import { api } from '../../lib/api';
 
+const generateClientId = () =>
+  typeof globalThis.crypto?.randomUUID === 'function'
+    ? globalThis.crypto.randomUUID()
+    : Math.random().toString(36).slice(2);
+
 export const PostFeed: React.FC = () => {
   const { user, session } = useAuth();
   const { toast } = useToast();
@@ -42,7 +47,16 @@ export const PostFeed: React.FC = () => {
         user: post.user ?? post.author ?? undefined,
         created_at: post.created_at ?? post.createdAt,
         updated_at: post.updated_at ?? post.updatedAt,
-        tags: Array.isArray(post.tags) ? post.tags : []
+        tags: Array.isArray(post.tags) ? post.tags : [],
+        media: Array.isArray(post.media)
+          ? post.media.map((item: any) => ({
+              id: item.id ?? item.assetId ?? generateClientId(),
+              url: item.url ?? item.publicUrl ?? '',
+              media_type: item.media_type ?? item.mediaType ?? 'image',
+              metadata: item.metadata ?? null,
+              storage_bucket: item.storage_bucket ?? null
+            }))
+          : []
       }));
 
       let transformedPosts = normalized;
@@ -170,6 +184,7 @@ const samplePosts: Post[] = [
     moderation_status: 'approved',
     created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     updated_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    media: [],
     user: {
       id: 'sample1',
       email: 'swami@example.com',
@@ -196,6 +211,7 @@ const samplePosts: Post[] = [
     moderation_status: 'approved',
     created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
     updated_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+    media: [],
     user: {
       id: 'sample2',
       email: 'devi@example.com',

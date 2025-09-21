@@ -14,7 +14,13 @@ export class InMemoryPostRepository implements PostRepository {
       tags: input.tags ?? [],
       moderationStatus: input.moderationStatus ?? 'pending',
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
+      media: (input.media ?? []).map((item) => ({
+        id: item.assetId,
+        url: `https://uploads.sanaathan.local/${input.userId}/${item.assetId}`,
+        mediaType: item.type,
+        metadata: item.metadata ?? {}
+      }))
     });
     this.items.set(post.id, post);
     return post;

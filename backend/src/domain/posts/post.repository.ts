@@ -7,6 +7,7 @@ export interface CreatePostInput {
   spiritualTopic?: string | null;
   tags: string[];
   moderationStatus?: 'approved' | 'pending' | 'flagged' | 'rejected';
+  media?: Array<{ assetId: string; type: 'image' | 'video'; metadata?: Record<string, unknown> }>;
 }
 
 export interface PostRepository {

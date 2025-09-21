@@ -106,6 +106,7 @@ export async function createContainer({ config }: ContainerOptions): Promise<Con
     config.supabaseUrl && config.supabaseServiceRoleKey
       ? getSupabaseClient(config)
       : undefined;
+  const postMediaBucket = config.postMediaBucket ?? 'post-media';
   const experienceSvc = new ExperienceService(supabaseClient);
 
   container.register('repo.user', () => userRepository);
@@ -134,7 +135,10 @@ export async function createContainer({ config }: ContainerOptions): Promise<Con
     'usecase.post.listTrending',
     () => new ListTrendingTopicsUseCase(experienceSvc)
   );
-  container.register('usecase.post.generateUploadUrl', () => new GenerateMediaUploadUrlUseCase());
+  container.register(
+    'usecase.post.generateUploadUrl',
+    () => new GenerateMediaUploadUrlUseCase({ storageClient: supabaseClient, bucket: postMediaBucket })
+  );
   container.register(
     'usecase.reading.getDaily',
     () => new GetDailyReadingUseCase(experienceSvc)

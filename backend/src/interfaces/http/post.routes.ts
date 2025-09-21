@@ -8,11 +8,18 @@ import type { ListTrendingTopicsUseCase } from '../../app/use-cases/posts/list-t
 import type { GenerateMediaUploadUrlUseCase } from '../../app/use-cases/posts/generate-media-upload-url.js';
 import type { Post } from '../../domain/posts/post.entity.js';
 
+const MediaAttachmentSchema = z.object({
+  assetId: z.string().uuid(),
+  type: z.enum(['image', 'video']),
+  metadata: z.record(z.unknown()).optional()
+});
+
 const CreatePostSchema = z.object({
   userId: z.string().uuid(),
   content: z.string().min(10),
   spiritualTopic: z.string().nullable().optional(),
-  tags: z.array(z.string()).optional()
+  tags: z.array(z.string()).optional(),
+  media: z.array(MediaAttachmentSchema).optional()
 });
 
 const FeedQuerySchema = z
@@ -76,7 +83,14 @@ function adaptPost(post: Post) {
           spiritual_name: json.author.spiritualName ?? null,
           spiritual_path: json.author.spiritualPath ?? null
         }
-      : undefined
+      : undefined,
+    media: (json.media ?? []).map((item) => ({
+      id: item.id,
+      url: item.url,
+      media_type: item.mediaType,
+      metadata: item.metadata ?? null,
+      storage_bucket: item.storageBucket ?? null
+    }))
   };
 }
 
@@ -88,7 +102,8 @@ export async function registerPostRoutes(app: FastifyInstance, _opts: FastifyPlu
       userId: payload.userId,
       content: payload.content,
       spiritualTopic: payload.spiritualTopic ?? null,
-      tags: payload.tags ?? []
+      tags: payload.tags ?? [],
+      media: payload.media
     });
 
     reply.code(201).send({ post: adaptPost(post) });

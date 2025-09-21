@@ -9,6 +9,7 @@ export interface CreatePostInput {
   content: string;
   spiritualTopic?: string | null;
   tags?: string[];
+  media?: Array<{ assetId: string; type: 'image' | 'video'; metadata?: Record<string, unknown> }>;
 }
 
 export class CreatePostUseCase {
@@ -21,7 +22,8 @@ export class CreatePostUseCase {
       content: input.content,
       spiritualTopic: input.spiritualTopic ?? null,
       tags: input.tags ?? [],
-      moderationStatus: 'pending'
+      moderationStatus: 'pending',
+      media: input.media
     });
 
     // Kick off asynchronous ingestion for RAG/KAG pipelines
