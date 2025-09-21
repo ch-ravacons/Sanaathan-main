@@ -2,15 +2,15 @@ export interface User {
   id: string;
   email: string;
   full_name: string;
-  spiritual_name?: string;
-  phone?: string;
-  location?: string;
-  age_group?: string;
-  gender?: string;
+  spiritual_name?: string | null;
+  phone?: string | null;
+  location?: string | null;
+  age_group?: string | null;
+  gender?: string | null;
   interests: string[];
   spiritual_path: string;
   path_practices: string[];
-  bio?: string;
+  bio?: string | null;
   created_at: string;
   updated_at: string;
 }

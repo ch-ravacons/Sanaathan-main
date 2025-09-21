@@ -34,7 +34,7 @@ export const AuthPage: React.FC = () => {
               <button
                 onClick={async () => {
                   const { supabase } = await import('../../lib/supabase');
-                  await supabase.auth.signOut();
+                  await supabase?.auth.signOut();
                 }}
                 className="text-sm text-gray-500 hover:text-gray-700 underline"
               >

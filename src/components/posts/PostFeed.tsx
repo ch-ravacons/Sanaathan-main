@@ -53,13 +53,9 @@ export const PostFeed: React.FC = () => {
           .select(`
             *,
             users(*)
-          `);
-
-        if (effectiveUserId) {
-          query = query.or(`moderation_status.eq.approved,user_id.eq.${effectiveUserId}`);
-        } else {
-          query = query.eq('moderation_status', 'approved');
-        }
+          `)
+          // Fetch approved posts first; we'll merge in my posts explicitly below to avoid OR quirks with UUIDs
+          .eq('moderation_status', 'approved');
       }
 
       const { data, error } = await query
@@ -76,6 +72,31 @@ export const PostFeed: React.FC = () => {
         }
         return { ...post, user: post.users } as Post;
       });
+
+      if (activeTab === 'all' && effectiveUserId) {
+        const { data: myPostsData, error: myPostsError } = await supabase
+          .from('posts')
+          .select(`
+            *,
+            users(*)
+          `)
+          .eq('user_id', effectiveUserId)
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        if (!myPostsError && myPostsData) {
+          const merged = new Map<string, Post>();
+          transformedPosts.forEach((post) => merged.set(post.id, post));
+
+          myPostsData.forEach((post: any) => {
+            merged.set(post.id, { ...post, user: post.users || user || undefined } as Post);
+          });
+
+          transformedPosts = Array.from(merged.values()).sort(
+            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
+        }
+      }
 
       // Optional interests-based prioritization
       if (interestsKey) {

@@ -7,7 +7,7 @@ interface SignInFormProps {
   onSuccess: () => void; // optional usage; router guard is fine too
 }
 
-export const SignInForm: React.FC<SignInFormProps> = ({ onSuccess }) => {
+export const SignInForm: React.FC<SignInFormProps> = ({ }) => {
   const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
