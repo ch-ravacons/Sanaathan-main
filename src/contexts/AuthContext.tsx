@@ -1,5 +1,5 @@
 // src/contexts/AuthContext.tsx
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 import { User, AuthState } from '../types';
@@ -38,6 +38,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Lightweight, safe cache of display-only profile fields (not tokens)
   const USER_CACHE_KEY = 'sd_user_cache_v1';
 
+  const updateUserCache = useCallback((value: User | null) => {
+    try {
+      if (value) {
+        localStorage.setItem(USER_CACHE_KEY, JSON.stringify(value));
+      } else {
+        localStorage.removeItem(USER_CACHE_KEY);
+      }
+    } catch (error) {
+      console.warn('⚠️ Unable to update user cache:', error);
+    }
+  }, []);
+
   // Hydrate UI quickly from cache so the header shows a name on refresh
   useEffect(() => {
     try {
@@ -49,8 +61,94 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser((prev) => prev ?? cached);
         }
       }
-    } catch {}
+    } catch (error) {
+      console.warn('⚠️ Failed to hydrate user cache:', error);
+    }
   }, []);
+
+  const fetchUserProfile = useCallback(
+    async (userId: string) => {
+      const client = supabase;
+      if (!client) {
+        console.warn('⚠️ fetchUserProfile called without Supabase client');
+        setUser(null);
+        resetPreferences();
+        updateUserCache(null);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await client
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (error || !data) {
+          if (error) {
+            console.warn('⚠️ Profile fetch error (non-fatal):', error.message ?? error);
+          }
+          const { data: authData } = await client.auth.getUser();
+          const authUser = authData?.user;
+          if (authUser) {
+            const fallbackUser: User = {
+              id: authUser.id,
+              email: authUser.email || '',
+              full_name: authUser.user_metadata?.full_name || authUser.email || 'User',
+              spiritual_name: authUser.user_metadata?.spiritual_name,
+              interests: [],
+              spiritual_path: '',
+              path_practices: [],
+              avatar_url: authUser.user_metadata?.avatar_url ?? null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            } as User;
+            setUser(fallbackUser);
+            setPreferencesFromProfile(fallbackUser);
+            updateUserCache(fallbackUser);
+          } else {
+            setUser(null);
+            resetPreferences();
+            updateUserCache(null);
+          }
+          return;
+        }
+
+        setUser(data as User);
+        setPreferencesFromProfile(data as User);
+        updateUserCache(data as User);
+      } catch (error: any) {
+        console.warn('⚠️ Profile fetch threw (non-fatal):', error?.message ?? error);
+        const { data: authData } = await client.auth.getUser();
+        const authUser = authData?.user;
+        if (authUser) {
+          const fallbackUser: User = {
+            id: authUser.id,
+            email: authUser.email || '',
+            full_name: authUser.user_metadata?.full_name || authUser.email || 'User',
+            spiritual_name: authUser.user_metadata?.spiritual_name,
+            interests: [],
+            spiritual_path: '',
+            path_practices: [],
+            avatar_url: authUser.user_metadata?.avatar_url ?? null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          } as User;
+          setUser(fallbackUser);
+          setPreferencesFromProfile(fallbackUser);
+          updateUserCache(fallbackUser);
+        } else {
+          setUser(null);
+          resetPreferences();
+          updateUserCache(null);
+        }
+      } finally {
+        setLoading(false);
+      }
+    },
+    [resetPreferences, setPreferencesFromProfile, updateUserCache]
+  );
 
   useEffect(() => {
     let alive = true;
@@ -65,7 +163,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Initial session load
     (async () => {
       try {
-        if (!supabase) {
+        const client = supabase;
+        if (!client) {
           console.log('❌ Supabase not configured - skipping auth initialization');
           if (alive) {
             setSession(null);
@@ -76,7 +175,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
 
-        const { data, error } = await supabase.auth.getSession();
+        const { data, error } = await client.auth.getSession();
         if (error) {
           console.error('❌ getSession error:', error);
         }
@@ -125,82 +224,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       clearTimeout(timeoutId);
       subscription?.unsubscribe();
     };
-  }, []);
-
-  const fetchUserProfile = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (error || !data) {
-        // No profile row or table missing – fall back to auth user
-        if (error) {
-          console.warn('⚠️ Profile fetch error (non-fatal):', error.message ?? error);
-        }
-        const { data: authData } = await supabase.auth.getUser();
-        const authUser = authData?.user;
-        if (authUser) {
-          const fallbackUser: User = {
-            id: authUser.id,
-            email: authUser.email || '',
-            full_name: authUser.user_metadata?.full_name || authUser.email || 'User',
-            spiritual_name: authUser.user_metadata?.spiritual_name,
-            interests: [],
-            spiritual_path: '',
-            path_practices: [],
-            avatar_url: authUser.user_metadata?.avatar_url ?? null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          } as User;
-          setUser(fallbackUser);
-          setPreferencesFromProfile(fallbackUser);
-          try { localStorage.setItem(USER_CACHE_KEY, JSON.stringify(fallbackUser)); } catch {}
-        } else {
-          setUser(null);
-          resetPreferences();
-          try { localStorage.removeItem(USER_CACHE_KEY); } catch {}
-        }
-        return;
-      }
-
-      setUser(data as User);
-      setPreferencesFromProfile(data as User);
-      try { localStorage.setItem(USER_CACHE_KEY, JSON.stringify(data)); } catch {}
-    } catch (e: any) {
-      console.warn('⚠️ Profile fetch threw (non-fatal):', e?.message ?? e);
-      const { data: authData } = await supabase.auth.getUser();
-      const authUser = authData?.user;
-      if (authUser) {
-        const fallbackUser: User = {
-          id: authUser.id,
-          email: authUser.email || '',
-          full_name: authUser.user_metadata?.full_name || authUser.email || 'User',
-          spiritual_name: authUser.user_metadata?.spiritual_name,
-          interests: [],
-          spiritual_path: '',
-          path_practices: [],
-          avatar_url: authUser.user_metadata?.avatar_url ?? null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        } as User;
-        setUser(fallbackUser);
-        setPreferencesFromProfile(fallbackUser);
-        try { localStorage.setItem(USER_CACHE_KEY, JSON.stringify(fallbackUser)); } catch {}
-      } else {
-        setUser(null);
-        resetPreferences();
-        try { localStorage.removeItem(USER_CACHE_KEY); } catch {}
-      }
-    } finally {
-      // Always end the loading state, even if profile failed
-      setLoading(false);
-    }
-  };
+  }, [fetchUserProfile, resetPreferences]);
 
   const signUp = async (emailRaw: string, passwordRaw: string, userData: Partial<User>) => {
+    const client = supabase;
+    if (!client) {
+      const err = new Error('Supabase client not configured');
+      console.error('❌ Signup blocked:', err.message);
+      return { error: err };
+    }
+
     const email = (emailRaw || '').trim();
     const password = passwordRaw || '';
 
@@ -211,7 +244,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
+      const { data: authData, error: authError } = await client.auth.signUp({ email, password });
       if (authError) {
         console.error('❌ Auth signup error:', authError);
         return { error: authError };
@@ -225,7 +258,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // Create profile row (non-fatal if it fails)
-      const { error: profileError } = await supabase
+      const { error: profileError } = await client
         .from('users')
         .insert([{ id: uid, email, ...userData }]);
 
@@ -248,16 +281,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signIn = async (emailRaw: string, passwordRaw: string) => {
+    const client = supabase;
+    if (!client) {
+      return { error: new Error('Supabase client not configured') };
+    }
     const email = (emailRaw || '').trim();
     const password = passwordRaw || '';
     if (!email || !password) return { error: new Error('Email and password are required') };
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await client.auth.signInWithPassword({ email, password });
       if (error) {
         console.error('❌ Signin error:', error);
       } else {
         console.log('✅ Signin ok, session=', !!data.session);
+        const latestSession = data.session ?? (await client.auth.getSession()).data.session ?? null;
+        setSession(latestSession);
+        const uid = latestSession?.user?.id;
+        if (uid) {
+          await fetchUserProfile(uid);
+        }
       }
       return { error };
     } catch (e) {
@@ -268,20 +311,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
-      await supabase.auth.signOut();
+      const client = supabase;
+      if (!client) {
+        console.warn('⚠️ signOut called without Supabase client. Clearing local state only.');
+      } else {
+        const { error: localError } = await client.auth.signOut({ scope: 'local' });
+        if (localError && localError.message !== 'Not logged in.') {
+          console.warn('⚠️ Local signOut error:', localError.message ?? localError);
+        }
+
+        const { error: globalError } = await client.auth.signOut({ scope: 'global' });
+        if (globalError && globalError.message !== 'Not logged in.') {
+          console.warn('⚠️ Global signOut error:', globalError.message ?? globalError);
+        }
+      }
     } finally {
       setUser(null);
       setSession(null);
       setLoading(false);
       resetPreferences();
-      try { localStorage.removeItem(USER_CACHE_KEY); } catch {}
+      updateUserCache(null);
     }
   };
 
   const updateProfile = async (updates: Partial<User>) => {
     try {
       if (!user) return { error: new Error('No user logged in') };
-      const { error } = await supabase
+      const client = supabase;
+      if (!client) {
+        return { error: new Error('Supabase client not configured') };
+      }
+      const { error } = await client
         .from('users')
         .update(updates)
         .eq('id', user.id);
@@ -289,6 +349,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const nextUser = { ...user, ...updates } as User;
       setUser(nextUser);
       setPreferencesFromProfile(nextUser);
+      updateUserCache(nextUser);
       return { error: null };
     } catch (e) {
       return { error: e };

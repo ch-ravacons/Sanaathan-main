@@ -15,6 +15,7 @@ export const Button: React.FC<ButtonProps> = ({
   children,
   className = '',
   disabled,
+  type = 'button',
   ...props
 }) => {
   const baseStyles =
@@ -44,6 +45,7 @@ export const Button: React.FC<ButtonProps> = ({
         isDisabled ? 'opacity-60 cursor-not-allowed' : ''
       } ${className}`}
       disabled={isDisabled}
+      type={type}
       {...props}
     >
       {loading && <Loader2 className="w-4 h-4 animate-spin" />}

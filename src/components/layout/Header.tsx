@@ -69,7 +69,9 @@ export const Header: React.FC<HeaderProps> = ({ onProfile }) => {
 
             <Button
               variant="ghost"
-              onClick={signOut}
+              onClick={async () => {
+                await signOut();
+              }}
               className="p-2"
             >
               <LogOut className="w-5 h-5" />

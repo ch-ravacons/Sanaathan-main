@@ -338,7 +338,7 @@ export class ExperienceService {
         const { data, error } = await query;
         if (!error && data) {
           let followingIds: string[] = [];
-          let mutualCounts = new Map<string, number>();
+          const mutualCounts = new Map<string, number>();
           if (userId) {
             const { data: following } = await this.client
               .from('follows')
@@ -890,7 +890,7 @@ export class ExperienceService {
 
     const uniqueDays = Array.from(new Set(days));
     let streak = 0;
-    let current = new Date();
+    const current = new Date();
 
     const containsDay = (day: string) => uniqueDays.includes(day);
 

@@ -4,10 +4,10 @@ import { Button } from '../ui/Button';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface SignInFormProps {
-  onSuccess: () => void; // optional usage; router guard is fine too
+  onSuccess?: () => void; // optional usage; router guard is fine too
 }
 
-export const SignInForm: React.FC<SignInFormProps> = ({ }) => {
+export const SignInForm: React.FC<SignInFormProps> = ({ onSuccess }) => {
   const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,8 +35,7 @@ export const SignInForm: React.FC<SignInFormProps> = ({ }) => {
 
     // Success: stop spinner. Your route guard/App should now switch to dashboard.
     setLoading(false);
-    // If you want instant navigation, call onSuccess();
-    // onSuccess?.();
+    onSuccess?.();
   };
 
   return (
