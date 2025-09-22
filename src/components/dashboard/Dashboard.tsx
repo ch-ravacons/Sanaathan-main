@@ -1,6 +1,17 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BookOpen, Users, Calendar, Heart, Check, UserPlus, MapPin, CalendarClock } from 'lucide-react';
+import {
+  BookOpen,
+  Users,
+  Calendar,
+  Heart,
+  Check,
+  MapPin,
+  CalendarClock,
+  Home,
+  Bot,
+  Flame
+} from 'lucide-react';
 
 import { Header } from '../layout/Header';
 import { Welcome } from './Welcome';
@@ -11,9 +22,18 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../ui/Toast';
 import { api, queryKeys, type SuggestedConnection, type TrendingTopic, type EventItem } from '../../lib/api';
 import { useUserPreferences } from '../../state/userPreferences';
+import { Card } from '../ui/Card';
+import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
 
 interface DashboardProps {
   onNavigate: (page: 'dashboard' | 'profile') => void;
+}
+
+interface MobileNavItem {
+  label: string;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  target: string;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
@@ -128,12 +148,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   );
   const devotionSummary = devotionSummaryQuery.data?.summary;
   const devotionMeter = devotionSummary?.meter ?? 0;
+  const meterValue = Math.min(Math.max(devotionMeter, 0), 100);
 
   const followMutation = useMutation({
     mutationFn: (input: { followerId: string; followeeId: string }) => api.followUser(input),
     onMutate: async (variables) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.suggestions(user?.id ?? null) });
-      const previous = queryClient.getQueryData<{ suggestions: SuggestedConnection[] }>(queryKeys.suggestions(user?.id ?? null));
+      const previous = queryClient.getQueryData<{ suggestions: SuggestedConnection[] }>(
+        queryKeys.suggestions(user?.id ?? null)
+      );
       if (previous) {
         queryClient.setQueryData(queryKeys.suggestions(user?.id ?? null), {
           suggestions: previous.suggestions.map((item) =>
@@ -158,7 +181,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     mutationFn: (input: { followerId: string; followeeId: string }) => api.unfollowUser(input),
     onMutate: async (variables) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.suggestions(user?.id ?? null) });
-      const previous = queryClient.getQueryData<{ suggestions: SuggestedConnection[] }>(queryKeys.suggestions(user?.id ?? null));
+      const previous = queryClient.getQueryData<{ suggestions: SuggestedConnection[] }>(
+        queryKeys.suggestions(user?.id ?? null)
+      );
       if (previous) {
         queryClient.setQueryData(queryKeys.suggestions(user?.id ?? null), {
           suggestions: previous.suggestions.map((item) =>
@@ -240,273 +265,398 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     setSelectedTopic((prev) => (prev === topic ? null : topic));
   };
 
+  const mobileNavItems: MobileNavItem[] = useMemo(
+    () => [
+      { label: 'Feed', icon: Home, target: 'dashboard-feed' },
+      { label: 'Guidance', icon: Bot, target: 'dashboard-guidance' },
+      { label: 'Events', icon: CalendarClock, target: 'dashboard-events' },
+      { label: 'Tracker', icon: Flame, target: 'dashboard-tracker' }
+    ],
+    []
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-sand-50 pb-24 lg:pb-10">
       <Header onProfile={() => onNavigate('profile')} />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Welcome />
-
-        {user && devotionSummary && (
-          <div className="mb-6 bg-white border border-orange-100 rounded-lg shadow-sm p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-semibold text-orange-700">Spiritual Meter</span>
-              <span className="text-xs font-medium text-orange-600">{devotionMeter}%</span>
-            </div>
-            <div className="w-full h-2 rounded-full bg-orange-100 overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-orange-500 to-red-500 transition-all duration-500"
-                style={{ width: `${Math.min(Math.max(devotionMeter, 0), 100)}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          <div className="lg:col-span-3">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-              {quickActions.map((action) => (
-                <div
-                  key={action.label}
-                  className="bg-white rounded-lg p-4 shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
-                >
-                  <action.icon className="w-8 h-8 text-orange-600 mb-2" />
-                  <h3 className="font-semibold text-gray-900">{action.label}</h3>
-                  <p className="text-sm text-gray-500 line-clamp-3">{action.description}</p>
-                </div>
-              ))}
-            </div>
-
-            <PostFeed topicFilter={selectedTopic} onTopicFilterClear={() => setSelectedTopic(null)} />
-          </div>
-
-          <div className="lg:col-span-1 space-y-6">
-            {dailyReadingQuery.data?.reading && (
-              <div className="bg-gradient-to-br from-orange-50 to-white border border-orange-100 rounded-lg shadow-sm p-6">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-1 flex items-center gap-2">
-                      <BookOpen className="w-5 h-5 text-orange-600" /> Daily Reading
-                    </h3>
-                    <p className="text-sm font-medium text-gray-800">{dailyReadingQuery.data.reading.title}</p>
-                    {dailyReadingQuery.data.reading.summary && (
-                      <p className="text-sm text-gray-600 mt-2 line-clamp-4">
-                        {dailyReadingQuery.data.reading.summary}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <div className="mt-4 flex items-center justify-between">
-                  <span className="text-xs text-gray-500">
-                    Path: {dailyReadingQuery.data.reading.path.toUpperCase()}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleMarkReadingComplete}
-                    disabled={markReadingMutation.isPending}
-                    className="inline-flex items-center gap-2 text-xs font-medium text-orange-600 hover:text-orange-700"
-                  >
-                    <Check className="w-4 h-4" />
-                    {markReadingMutation.isPending ? 'Saving…' : 'Mark as complete'}
-                  </button>
-                </div>
+      <main className="max-w-7xl mx-auto px-4 pt-8 pb-12 sm:px-6 lg:px-8">
+        <div className="grid gap-6 lg:gap-8 lg:grid-cols-[280px_minmax(0,1fr)_320px] xl:grid-cols-[300px_minmax(0,1fr)_360px]">
+          <section className="order-2 flex flex-col gap-6 lg:order-1">
+            <Card variant="subtle" padding="md" className="space-y-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600">Today</p>
+                <h3 className="text-xl font-semibold text-sand-900">Quick Highlights</h3>
+                <p className="text-sm text-sand-600">Stay aligned with your practice at a glance.</p>
               </div>
-            )}
-
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Trending Topics</h3>
               <div className="space-y-3">
-                {trendingQuery.isLoading && (
-                  <div className="space-y-2">
-                    {[1, 2, 3].map((item) => (
-                      <div key={item} className="h-4 bg-gray-100 animate-pulse rounded" />
-                    ))}
-                  </div>
-                )}
-                {!trendingQuery.isLoading && trendingTopics.length === 0 && (
-                  <div className="text-sm text-gray-500">No trending topics yet</div>
-                )}
-                {trendingTopics.map((topic) => {
-                  const isActive = selectedTopic === topic.topic;
-                  return (
-                    <button
-                      type="button"
-                      key={topic.topic}
-                      onClick={() => handleTrendingSelect(topic.topic)}
-                      className={`w-full flex items-center justify-between px-2 py-1 rounded ${
-                        isActive ? 'bg-orange-50 text-orange-700 border border-orange-200' : 'hover:bg-gray-50 text-gray-700'
-                      }`}
-                    >
-                      <span className="text-sm">#{topic.topic}</span>
-                      <span className="text-xs text-gray-500">{topic.post_count} posts</span>
-                    </button>
-                  );
-                })}
-                {selectedTopic && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedTopic(null)}
-                    className="text-xs text-orange-600 hover:text-orange-700 font-medium"
+                {quickActions.map((action) => (
+                  <div
+                    key={action.label}
+                    className="flex items-center gap-3 rounded-2xl border border-sand-100 bg-white/80 px-3 py-3 shadow-sm"
                   >
-                    Clear filter
-                  </button>
-                )}
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-100 text-brand-600">
+                      <action.icon className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-sand-900">{action.label}</p>
+                      <p className="text-xs leading-relaxed text-sand-600 line-clamp-2">{action.description}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
+            </Card>
 
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Suggested Connections</h3>
+            <Card
+              padding="md"
+              className="space-y-4 bg-gradient-to-br from-brand-25 via-white to-white"
+              id="dashboard-connections"
+            >
+              <div className="flex items-start justify-between">
+                <div className="space-y-1">
+                  <h3 className="text-lg font-semibold text-sand-900">Suggested Connections</h3>
+                  <p className="text-sm text-sand-600">Build meaningful bonds with fellow seekers.</p>
+                </div>
+                <span className="flex h-7 min-w-[1.75rem] items-center justify-center rounded-full bg-brand-100 px-2 text-xs font-semibold text-brand-600">
+                  {connectionsToShow.length}
+                </span>
+              </div>
               <div className="space-y-4">
                 {suggestionsQuery.isLoading && (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {[1, 2, 3].map((item) => (
-                      <div key={item} className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-gray-100 rounded-full animate-pulse" />
+                      <div
+                        key={item}
+                        className="flex items-center justify-between rounded-2xl border border-sand-100 bg-sand-25 p-3 shadow-sm"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 animate-pulse rounded-full bg-sand-100" />
                           <div className="space-y-2">
-                            <div className="w-24 h-3 bg-gray-100 rounded" />
-                            <div className="w-16 h-3 bg-gray-100 rounded" />
+                            <div className="h-3 w-24 rounded bg-sand-100" />
+                            <div className="h-3 w-16 rounded bg-sand-100" />
                           </div>
                         </div>
-                        <div className="w-16 h-6 bg-gray-100 rounded" />
+                        <div className="h-8 w-20 rounded-full bg-sand-100" />
                       </div>
                     ))}
                   </div>
                 )}
+
                 {!suggestionsQuery.isLoading && !user && (
-                  <div className="text-sm text-gray-500">Sign in to receive personalized suggestions.</div>
+                  <p className="text-sm text-sand-600">Sign in to receive personalized suggestions.</p>
                 )}
+
                 {suggestionsQuery.isError && (
-                  <div className="text-sm text-red-500">Unable to load suggestions right now.</div>
+                  <p className="text-sm text-brand-600">Unable to load suggestions right now.</p>
                 )}
+
                 {!suggestionsQuery.isLoading && user && connectionsToShow.length === 0 && !suggestionsQuery.isError && (
-                  <div className="text-sm text-gray-500">No suggestions yet</div>
+                  <p className="text-sm text-sand-600">No suggestions yet. Check back soon!</p>
                 )}
+
                 {connectionsToShow.map((connection) => {
                   const isFollowPending =
                     (followMutation.isPending && followMutation.variables?.followeeId === connection.id) ||
                     (unfollowMutation.isPending && unfollowMutation.variables?.followeeId === connection.id);
+                  const sharedInterest = connection.shared_interests?.[0];
+                  const displayName = connection.full_name || connection.spiritual_path || 'Spiritual seeker';
+
+                  const renderFollowButton = (extraClassName?: string) => (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={connection.is_following ? 'ghost' : 'outline'}
+                      className={`min-w-[84px] justify-center focus-visible:ring-offset-0 ${extraClassName ?? ''}`}
+                      loading={isFollowPending}
+                      onClick={() => handleToggleFollow(connection)}
+                    >
+                      {connection.is_following ? 'Following' : 'Follow'}
+                    </Button>
+                  );
+
                   return (
-                    <div key={connection.id} className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center text-white text-sm font-semibold">
-                          {connection.full_name?.charAt(0) ?? 'S'}
+                    <div key={connection.id} className="group relative">
+                      <div className="grid grid-cols-[auto,1fr,auto] items-center gap-3 rounded-2xl border border-brand-100 bg-white/80 px-3 py-3 shadow-sm">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-500 text-sm font-semibold uppercase text-white">
+                          {displayName.charAt(0)}
                         </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{connection.full_name}</p>
-                          <p className="text-xs text-gray-500">{connection.spiritual_path ?? 'Spiritual seeker'}</p>
+                        <div className="min-w-0 space-y-1">
+                          <p className="truncate text-sm font-semibold text-sand-900">{displayName}</p>
+                          <p className="truncate text-xs text-sand-500">{connection.spiritual_path ?? 'Seeker'}</p>
+                          {sharedInterest && (
+                            <div className="flex flex-wrap gap-1">
+                              <Badge tone="neutral" size="sm">#{sharedInterest}</Badge>
+                            </div>
+                          )}
+                        </div>
+                        {renderFollowButton()}
+                      </div>
+
+                      <div className="pointer-events-none absolute left-1/2 bottom-full z-20 hidden w-64 -translate-x-1/2 -translate-y-3 opacity-0 transition-all duration-200 group-hover:flex group-hover:-translate-y-1 group-hover:opacity-100 group-hover:pointer-events-auto">
+                        <div className="w-full rounded-2xl border border-brand-100 bg-white p-4 text-left shadow-panel">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-500 text-sm font-semibold uppercase text-white">
+                              {displayName.charAt(0)}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-sand-900">{displayName}</p>
+                              <p className="text-xs text-sand-500">{connection.spiritual_path ?? 'Seeker'}</p>
+                              {sharedInterest && <p className="text-xs text-sand-500">Shared interest: #{sharedInterest}</p>}
+                            </div>
+                          </div>
+                          <div className="mt-4 flex justify-end">
+                            <div className="pointer-events-auto">{renderFollowButton('pointer-events-auto')}</div>
+                          </div>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleFollow(connection)}
-                        disabled={isFollowPending}
-                        className={`text-xs font-medium flex items-center gap-2 ${
-                          connection.is_following ? 'text-gray-500 hover:text-gray-600' : 'text-orange-600 hover:text-orange-700'
-                        }`}
-                      >
-                        {connection.is_following ? (
-                          <>
-                            <Check className="w-3 h-3" /> Following
-                          </>
-                        ) : (
-                          <>
-                            <UserPlus className="w-3 h-3" /> Follow
-                          </>
-                        )}
-                      </button>
                     </div>
                   );
                 })}
               </div>
-            </div>
+            </Card>
 
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <CalendarClock className="w-5 h-5 text-orange-600" /> Upcoming Events
-              </h3>
-              <div className="space-y-4">
-                {eventsQuery.isLoading && (
-                  <div className="space-y-3">
-                    {[1, 2].map((item) => (
-                      <div key={item} className="h-16 bg-gray-100 rounded animate-pulse" />
-                    ))}
-                  </div>
-                )}
-                {!eventsQuery.isLoading && events.length === 0 && (
-                  <p className="text-sm text-gray-500">No events scheduled. Create one to uplift the community!</p>
-                )}
-                {events.slice(0, 4).map((event) => (
-                  <div key={event.id} className="border border-gray-100 rounded-md p-3">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">{event.title}</p>
-                        {event.location && (
-                          <p className="text-xs text-gray-500 flex items-center gap-1">
-                            <MapPin className="w-3 h-3" /> {event.location}
-                          </p>
-                        )}
-                        <p className="text-xs text-gray-500">Attending: {event.attendees_count}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleRsvp(event.id, 'going')}
-                          disabled={rsvpMutation.isPending}
-                          className={`text-xs font-medium px-2 py-1 rounded ${
-                            event.is_attending
-                              ? 'bg-orange-100 text-orange-700'
-                              : 'bg-orange-50 text-orange-600 hover:bg-orange-100'
-                          }`}
-                        >
-                          Going
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleRsvp(event.id, 'interested')}
-                          disabled={rsvpMutation.isPending}
-                          className="text-xs text-gray-500 border border-gray-200 px-2 py-1 rounded hover:border-gray-300"
-                        >
-                          Interested
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+            <Card padding="md" className="space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold text-sand-900">Community Members</h3>
+                <p className="text-sm text-sand-600">Explore seekers aligned with your interests.</p>
               </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Community Members</h3>
               <div className="space-y-3">
                 {communityQuery.isLoading && (
                   <div className="space-y-2">
                     {[1, 2, 3].map((item) => (
-                      <div key={item} className="h-12 bg-gray-100 rounded animate-pulse" />
+                      <div key={item} className="h-12 animate-pulse rounded-xl bg-sand-100" />
                     ))}
                   </div>
                 )}
+
                 {!communityQuery.isLoading && communityQuery.data?.members?.length === 0 && (
-                  <p className="text-sm text-gray-500">No members found for this interest yet.</p>
+                  <p className="text-sm text-sand-600">No members found for this interest yet.</p>
                 )}
+
                 {communityQuery.data?.members?.slice(0, 5).map((member) => (
-                  <div key={member.id} className="flex items-center justify-between">
+                  <div
+                    key={member.id}
+                    className="flex items-center justify-between rounded-xl border border-sand-100 bg-white/75 px-3 py-2.5"
+                  >
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{member.full_name}</p>
-                      <p className="text-xs text-gray-500">{member.spiritual_path ?? 'Seeker'}</p>
+                      <p className="text-sm font-semibold text-sand-900">{member.full_name}</p>
+                      <p className="text-xs text-sand-600">{member.spiritual_path ?? 'Seeker'}</p>
                     </div>
-                    {member.location && <span className="text-xs text-gray-400">{member.location}</span>}
+                    {member.location && <span className="text-xs text-sand-500">{member.location}</span>}
                   </div>
                 ))}
               </div>
+            </Card>
+
+            <Card padding="md" className="space-y-4" id="dashboard-events">
+              <div>
+                <h3 className="text-lg font-semibold text-sand-900">Upcoming Events</h3>
+                <p className="text-sm text-sand-600">Stay connected with spiritual gatherings.</p>
+              </div>
+              <div className="space-y-4">
+                {eventsQuery.isLoading && (
+                  <div className="space-y-3">
+                    {[1, 2].map((item) => (
+                      <div key={item} className="h-20 animate-pulse rounded-xl bg-sand-100" />
+                    ))}
+                  </div>
+                )}
+
+                {!eventsQuery.isLoading && events.length === 0 && (
+                  <p className="text-sm text-sand-600">No events scheduled. Create one to uplift the community!</p>
+                )}
+
+                {events.slice(0, 4).map((event) => (
+                  <div
+                    key={event.id}
+                    className="rounded-xl border border-sand-100 bg-white/85 px-3 py-3 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-sand-900">{event.title}</p>
+                        {event.location && (
+                          <p className="mt-1 flex items-center gap-1 text-xs text-sand-600">
+                            <MapPin className="h-3 w-3" /> {event.location}
+                          </p>
+                        )}
+                        <p className="text-xs text-sand-500">Attending: {event.attendees_count}</p>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={event.is_attending ? 'primary' : 'outline'}
+                          loading={rsvpMutation.isPending}
+                          onClick={() => handleRsvp(event.id, 'going')}
+                        >
+                          Going
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          disabled={rsvpMutation.isPending}
+                          onClick={() => handleRsvp(event.id, 'interested')}
+                        >
+                          Interested
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </section>
+
+          <section className="order-1 min-w-0 flex flex-col gap-6">
+            <Welcome />
+
+            <section id="dashboard-feed">
+              <PostFeed topicFilter={selectedTopic} onTopicFilterClear={() => setSelectedTopic(null)} />
+            </section>
+          </section>
+
+          <section className="order-3 flex flex-col gap-6 lg:order-3">
+            <div className="flex flex-col gap-6 lg:sticky lg:top-24">
+              {user && devotionSummary && (
+                <Card variant="accent" padding="md" className="space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600">Spiritual Meter</p>
+                      <h3 className="text-xl font-semibold text-sand-900">Your current energy</h3>
+                    </div>
+                    <Badge tone="brand" size="sm">{meterValue}%</Badge>
+                  </div>
+                  <div className="h-3 w-full overflow-hidden rounded-full bg-brand-100">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-brand-400 via-brand-500 to-brand-600 transition-all duration-500"
+                      style={{ width: `${meterValue}%` }}
+                    />
+                  </div>
+                  <dl className="grid grid-cols-2 gap-3 text-sm text-sand-700">
+                    <div>
+                      <dt className="text-xs uppercase tracking-wide text-sand-500">Total points</dt>
+                      <dd className="text-lg font-semibold text-sand-900">{devotionSummary.total_points}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs uppercase tracking-wide text-sand-500">Streak</dt>
+                      <dd className="text-lg font-semibold text-sand-900">{devotionSummary.streak} days</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs uppercase tracking-wide text-sand-500">Level</dt>
+                      <dd className="text-lg font-semibold text-sand-900">{devotionSummary.level}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs uppercase tracking-wide text-sand-500">Next milestone</dt>
+                      <dd className="text-lg font-semibold text-sand-900">{Math.max(0, 100 - meterValue)}% left</dd>
+                    </div>
+                  </dl>
+                </Card>
+              )}
+
+              {dailyReadingQuery.data?.reading && (
+                <Card padding="md" className="space-y-4 lg:shadow-panel">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-lg font-semibold text-sand-900">Daily Reading</h3>
+                      <p className="text-sm font-medium text-sand-700">{dailyReadingQuery.data.reading.title}</p>
+                      {dailyReadingQuery.data.reading.summary && (
+                        <p className="mt-2 text-sm leading-relaxed text-sand-600">
+                          {dailyReadingQuery.data.reading.summary}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="soft-divider" />
+                  <div className="flex items-center justify-between text-xs text-sand-500">
+                    <span>Path: {dailyReadingQuery.data.reading.path.toUpperCase()}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      loading={markReadingMutation.isPending}
+                      onClick={handleMarkReadingComplete}
+                    >
+                      <Check className="h-4 w-4" /> Mark complete
+                    </Button>
+                  </div>
+                </Card>
+              )}
+
+              <section id="dashboard-tracker">
+                <DevotionTracker />
+              </section>
+
+              <Card padding="md" className="space-y-4" id="dashboard-trending">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-sand-900">Trending Topics</h3>
+                  {selectedTopic && (
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedTopic(null)}>
+                      Clear
+                    </Button>
+                  )}
+                </div>
+                <div className="space-y-3">
+                  {trendingQuery.isLoading && (
+                    <div className="space-y-2">
+                      {[1, 2, 3].map((item) => (
+                        <div key={item} className="h-4 w-full animate-pulse rounded bg-sand-100" />
+                      ))}
+                    </div>
+                  )}
+
+                  {!trendingQuery.isLoading && trendingTopics.length === 0 && (
+                    <p className="text-sm text-sand-600">No trending topics yet</p>
+                  )}
+
+                  {trendingTopics.map((topic) => {
+                    const isActive = selectedTopic === topic.topic;
+                    return (
+                      <button
+                        type="button"
+                        key={topic.topic}
+                        onClick={() => handleTrendingSelect(topic.topic)}
+                        className={`w-full rounded-full border px-4 py-2 text-sm transition ${
+                          isActive
+                            ? 'border-brand-300 bg-brand-50 text-brand-700 shadow-soft'
+                            : 'border-transparent bg-sand-100/60 text-sand-700 hover:bg-sand-100'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="font-medium">#{topic.topic}</span>
+                          <span className="text-xs text-sand-500">{topic.post_count} posts</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </Card>
+
+              <section id="dashboard-guidance">
+                <GuidancePanel />
+              </section>
             </div>
-
-            <DevotionTracker />
-
-            <GuidancePanel />
-          </div>
+          </section>
         </div>
       </main>
+
+      <MobileBottomNav items={mobileNavItems} />
     </div>
   );
 };
+
+const MobileBottomNav: React.FC<{ items: MobileNavItem[] }> = ({ items }) => (
+  <nav className="fixed bottom-4 left-1/2 z-40 w-full max-w-md -translate-x-1/2 px-4 lg:hidden">
+    <div className="flex items-center justify-between rounded-full border border-sand-100/70 bg-sand-25/95 px-4 py-3 text-sand-600 shadow-soft backdrop-blur">
+      {items.map((item) => (
+        <a
+          key={item.target}
+          href={`#${item.target}`}
+          className="flex flex-col items-center gap-1 text-xs font-medium transition hover:text-brand-600"
+        >
+          <item.icon className="h-5 w-5" />
+          {item.label}
+        </a>
+      ))}
+    </div>
+  </nav>
+);

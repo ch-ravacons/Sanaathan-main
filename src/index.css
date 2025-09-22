@@ -1,3 +1,59 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    @apply font-sans;
+  }
+
+  body {
+    @apply bg-sand-50 text-sand-900 antialiased;
+  }
+
+  h1,
+  h2 {
+    @apply font-display font-normal tracking-tight text-sand-900;
+  }
+
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-sans font-semibold text-sand-900;
+  }
+
+  p {
+    @apply font-sans leading-relaxed text-sand-700;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white/90 backdrop-blur-sm border border-sand-100 rounded-2xl shadow-soft;
+  }
+
+  .card-muted {
+    @apply bg-sand-25 border-sand-100 shadow-soft;
+  }
+
+  .card-section {
+    @apply border-t border-sand-100 pt-4 mt-4;
+  }
+
+  .badge-pill {
+    @apply inline-flex items-center gap-1 rounded-full bg-brand-50 text-brand-700 px-3 py-1 text-xs font-medium;
+  }
+
+  .badge-muted {
+    @apply inline-flex items-center gap-1 rounded-full bg-sand-100 text-sand-700 px-3 py-1 text-xs font-medium;
+  }
+
+  .badge-success {
+    @apply inline-flex items-center gap-1 rounded-full bg-moss-100 text-moss-700 px-3 py-1 text-xs font-medium;
+  }
+
+  .soft-divider {
+    @apply h-px w-full bg-gradient-to-r from-transparent via-sand-200 to-transparent;
+  }
+}

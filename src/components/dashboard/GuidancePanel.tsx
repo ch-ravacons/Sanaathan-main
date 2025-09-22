@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Send, Bot, Loader2 } from 'lucide-react';
+import { Send, Bot } from 'lucide-react';
 
 import { api } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../ui/Toast';
+import { Card } from '../ui/Card';
+import { Button } from '../ui/Button';
 
 interface GuidancePanelProps {
   defaultPrompt?: string;
@@ -37,48 +39,33 @@ export const GuidancePanel: React.FC<GuidancePanelProps> = ({ defaultPrompt = ''
   });
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-      <div className="flex items-center gap-2 mb-3">
-        <Bot className="w-5 h-5 text-purple-600" />
-        <h3 className="font-semibold text-gray-900">Guidance Bot</h3>
+    <Card padding="md" className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Bot className="h-5 w-5 text-brand-500" />
+          <h3 className="text-lg font-semibold text-sand-900">Guidance Bot</h3>
+        </div>
       </div>
-      <p className="text-sm text-gray-500 mb-4">
-        Ask a question about scriptures, practices, or the path you follow and receive curated insights from community knowledge.
+      <p className="text-sm leading-relaxed text-sand-600">
+        Ask a question about scriptures, practices, or your path and receive curated insights from our collective wisdom.
       </p>
       <textarea
         value={question}
         onChange={(event) => setQuestion(event.target.value)}
         rows={3}
         placeholder="e.g., How do I deepen my meditation practice?"
-        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+        className="w-full rounded-xl border border-sand-200 bg-white/80 px-4 py-3 text-sm text-sand-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
       />
-      <ButtonRow
-        onSubmit={() => askMutation.mutate()}
-        loading={askMutation.isPending}
-      />
+      <div className="flex justify-end">
+        <Button type="button" variant="primary" size="sm" loading={askMutation.isPending} onClick={() => askMutation.mutate()}>
+          <Send className="h-4 w-4" /> Guidance
+        </Button>
+      </div>
       {response && (
-        <div className="mt-4 p-3 rounded bg-purple-50 border border-purple-100 text-sm text-purple-900 whitespace-pre-wrap">
+        <div className="rounded-2xl border border-moss-200 bg-moss-50/70 p-4 text-sm text-moss-800 whitespace-pre-wrap">
           {response}
         </div>
       )}
-    </div>
+    </Card>
   );
 };
-
-interface ButtonRowProps {
-  onSubmit: () => void;
-  loading: boolean;
-}
-
-const ButtonRow: React.FC<ButtonRowProps> = ({ onSubmit, loading }) => (
-  <div className="flex justify-end mt-3">
-    <button
-      type="button"
-      onClick={onSubmit}
-      disabled={loading}
-      className="inline-flex items-center gap-2 bg-purple-600 text-white text-sm font-medium px-4 py-2 rounded hover:bg-purple-700 disabled:opacity-50"
-    >
-      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Guidance
-    </button>
-  </div>
-);

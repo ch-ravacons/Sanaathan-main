@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { Send, AlertCircle, CheckCircle, Lightbulb, Paperclip, XCircle } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Select } from '../ui/Select';
+import { Card } from '../ui/Card';
 import { spiritualTopics } from '../../data/spiritualTopics';
 import { moderateContent, generateContentSuggestions } from '../../utils/contentModeration';
 import { useAuth } from '../../contexts/AuthContext';
@@ -117,17 +118,45 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
           fileName: file.name
         });
 
-        const uploadResponse = await fetch(uploadInfo.uploadUrl, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': file.type,
-            ...(uploadInfo.headers ?? {})
-          },
-          body: file
-        });
+        let uploadResponse: Response;
+        const lowerCaseHeaders = Object.fromEntries(
+          Object.entries(uploadInfo.headers ?? {}).map(([key, value]) => [key.toLowerCase(), value])
+        );
+
+        if (uploadInfo.uploadUrl.includes('uploads.sanaathan.local')) {
+          uploadResponse = await fetch(uploadInfo.uploadUrl, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': file.type,
+              ...uploadInfo.headers
+            },
+            body: file
+          });
+        } else {
+          const headers: Record<string, string> = {};
+          Object.entries(lowerCaseHeaders).forEach(([key, value]) => {
+            if (key !== 'content-type') {
+              headers[key] = value;
+            }
+          });
+          if (!headers['x-upsert']) {
+            headers['x-upsert'] = 'true';
+          }
+
+          const formData = new FormData();
+          formData.append('cacheControl', '3600');
+          formData.append('', file, file.name);
+
+          uploadResponse = await fetch(uploadInfo.uploadUrl, {
+            method: 'PUT',
+            headers,
+            body: formData
+          });
+        }
 
         if (!uploadResponse.ok) {
-          throw new Error('Failed to upload media');
+          const errorText = await uploadResponse.text().catch(() => null);
+          throw new Error(errorText || 'Failed to upload media');
         }
 
         mediaPayload.push({
@@ -178,23 +207,22 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
   ), [selectedTopic]);
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">Share Your Spiritual Insights</h3>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setShowGuidelines(!showGuidelines)}
-        >
-          <Lightbulb className="w-4 h-4 mr-1" />
+    <Card padding="md" className="mb-6 space-y-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-xl font-semibold text-sand-900">Share Your Spiritual Insights</h3>
+          <p className="text-sm text-sand-600">Offer your wisdom or seek guidance from the community.</p>
+        </div>
+        <Button variant="ghost" size="sm" onClick={() => setShowGuidelines(!showGuidelines)}>
+          <Lightbulb className="h-4 w-4" />
           Guidelines
         </Button>
       </div>
 
       {showGuidelines && (
-        <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-          <h4 className="font-medium text-orange-900 mb-2">Community Guidelines</h4>
-          <ul className="text-sm text-orange-800 space-y-1">
+        <div className="rounded-2xl border border-brand-100 bg-brand-50/80 p-4">
+          <h4 className="text-sm font-semibold text-brand-700">Community Guidelines</h4>
+          <ul className="mt-2 space-y-1 text-sm text-brand-800">
             <li>• Share authentic spiritual experiences and insights</li>
             <li>• Ask thoughtful questions to learn from others</li>
             <li>• Respect all spiritual paths and traditions</li>
@@ -231,7 +259,7 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
           </Select>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="mb-1 block text-sm font-medium text-sand-700">
               Tags (Optional)
             </label>
             <input
@@ -239,7 +267,7 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
               value={tags}
               onChange={(e) => setTags(e.target.value)}
               placeholder="meditation, wisdom, experience (comma-separated)"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              className="w-full rounded-xl border border-sand-200 px-3 py-2 text-sm text-sand-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-brand-400"
             />
           </div>
         </div>
@@ -255,7 +283,7 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
               onChange={handleFileSelect}
             />
           </label>
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-sand-400">
             {attachments.length}/{MAX_ATTACHMENTS} attachments
           </span>
         </div>
@@ -265,7 +293,7 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
             {attachments.map((attachment, index) => {
               const isVideo = attachment.file.type.startsWith('video/');
               return (
-                <div key={`${attachment.preview}-${index}`} className="relative border border-gray-200 rounded-lg overflow-hidden group">
+                <div key={`${attachment.preview}-${index}`} className="relative overflow-hidden rounded-2xl border border-sand-200 bg-sand-25 group">
                   {isVideo ? (
                     <video src={attachment.preview} className="w-full h-40 object-cover bg-black" controls />
                   ) : (
@@ -274,7 +302,7 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
                   <button
                     type="button"
                     onClick={() => handleRemoveAttachment(index)}
-                    className="absolute top-2 right-2 bg-white/80 rounded-full p-1 text-gray-700 hover:text-red-600"
+                    className="absolute right-2 top-2 rounded-full bg-white/85 p-1 text-sand-600 transition hover:text-brand-600"
                     aria-label="Remove attachment"
                   >
                     <XCircle className="w-4 h-4" />
@@ -297,14 +325,14 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
         )}
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="mb-2 block text-sm font-medium text-sand-700">
             Your Message
           </label>
           <textarea
             value={content}
             onChange={(e) => handleContentChange(e.target.value)}
             rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none"
+            className="w-full resize-none rounded-xl border border-sand-200 px-3 py-2 text-sm text-sand-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-brand-400"
             placeholder="Share your spiritual insights, experiences, or questions with the community..."
             required
           />
@@ -349,8 +377,8 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
           </div>
         )}
 
-        <div className="flex justify-between items-center">
-          <div className="text-sm text-gray-500">
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-sand-500">
             {content.length}/1000 characters
           </div>
           <Button
@@ -358,11 +386,11 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
             loading={loading}
             disabled={!content.trim() || content.trim().length < 10 || content.length > 1000}
           >
-            <Send className="w-4 h-4 mr-2" />
+            <Send className="h-4 w-4" />
             Share Post
           </Button>
         </div>
       </form>
-    </div>
+    </Card>
   );
 };

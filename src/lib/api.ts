@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/$/, '') ?? 'http://localhost:4000';
+const SUPABASE_STORAGE_BASE = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '') ?? null;
 
 export class ApiError extends Error {
   status: number;
@@ -14,13 +15,50 @@ export class ApiError extends Error {
   }
 }
 
-const PostMediaSchema = z.object({
-  id: z.string(),
-  type: z.enum(['image', 'video']),
-  url: z.string().url().nullable().optional(),
-  thumbnail_url: z.string().url().nullable().optional(),
-  alt_text: z.string().nullable().optional()
-});
+const PostMediaSchema = z
+  .object({
+    id: z.string(),
+    type: z.enum(['image', 'video']).optional().nullable(),
+    media_type: z.enum(['image', 'video']).optional().nullable(),
+    url: z.string().nullable().optional(),
+    public_url: z.string().nullable().optional(),
+    thumbnail_url: z.string().nullable().optional(),
+    alt_text: z.string().nullable().optional(),
+    metadata: z.record(z.unknown()).nullable().optional(),
+    storage_bucket: z.string().nullable().optional()
+  })
+  .transform((value) => {
+    const metadata = (value.metadata && typeof value.metadata === 'object' && !Array.isArray(value.metadata)
+      ? (value.metadata as Record<string, unknown>)
+      : {}) ?? {};
+    const candidateUrl = [value.url, value.public_url, metadata.url as string | undefined].find(
+      (candidate) => typeof candidate === 'string' && candidate.trim().length > 0
+    );
+    const path = (metadata.path as string | undefined) ?? (metadata.objectPath as string | undefined);
+    const storageBucket = value.storage_bucket ?? (metadata.storageBucket as string | undefined) ?? null;
+
+    let resolvedUrl: string | null = candidateUrl ? candidateUrl.trim() : null;
+
+    if (resolvedUrl && !/^https?:\/\//i.test(resolvedUrl)) {
+      if (SUPABASE_STORAGE_BASE && storageBucket && path) {
+        resolvedUrl = `${SUPABASE_STORAGE_BASE}/storage/v1/object/public/${storageBucket}/${path}`;
+      } else if (SUPABASE_STORAGE_BASE && storageBucket) {
+        resolvedUrl = `${SUPABASE_STORAGE_BASE}/storage/v1/object/public/${storageBucket}/${resolvedUrl.replace(/^\//, '')}`;
+      } else {
+        resolvedUrl = null;
+      }
+    }
+
+    return {
+      id: value.id,
+      type: (value.type ?? value.media_type ?? 'image') as 'image' | 'video',
+      url: resolvedUrl,
+      thumbnail_url: value.thumbnail_url ?? null,
+      alt_text: value.alt_text ?? (metadata.originalName as string | undefined) ?? null,
+      metadata,
+      storage_bucket: storageBucket
+    };
+  });
 
 const PostAuthorSchema = z
   .object({

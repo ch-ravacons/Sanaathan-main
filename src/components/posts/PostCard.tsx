@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
-import { Heart, MessageCircle, Share2, Flag, MoreHorizontal, ImageOff } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Flag, ImageOff } from 'lucide-react';
+
 import { Post, PostMedia } from '../../types';
 import { Button } from '../ui/Button';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../ui/Toast';
 import { spiritualTopics } from '../../data/spiritualTopics';
+import { Card } from '../ui/Card';
+import { Badge } from '../ui/Badge';
 
 interface PostCardProps {
   post: Post;
@@ -21,8 +24,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onUpdate }) => {
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const topic = post.spiritual_topic ?
-    spiritualTopics.find(t => t.id === post.spiritual_topic) : null;
+  const topic = post.spiritual_topic ? spiritualTopics.find((t) => t.id === post.spiritual_topic) : null;
 
   const safeTags = Array.isArray(post.tags) ? post.tags : [];
   const likes = typeof post.likes_count === 'number' ? post.likes_count : 0;
@@ -30,8 +32,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onUpdate }) => {
   const shares = typeof post.shares_count === 'number' ? post.shares_count : 0;
 
   const handleLike = async () => {
-    if (!user) return;
-    if (likeLoading) return;
+    if (!user || likeLoading) return;
 
     setLikeLoading(true);
     try {
@@ -39,7 +40,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onUpdate }) => {
         toast('Database connection not available', 'error');
         return;
       }
-      
+
       if (liked) {
         await supabase
           .from('post_likes')
@@ -47,11 +48,9 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onUpdate }) => {
           .eq('post_id', post.id)
           .eq('user_id', user.id);
       } else {
-        await supabase
-          .from('post_likes')
-          .insert([{ post_id: post.id, user_id: user.id }]);
+        await supabase.from('post_likes').insert([{ post_id: post.id, user_id: user.id }]);
       }
-      
+
       setLiked(!liked);
       onUpdate();
     } catch (error) {
@@ -61,8 +60,8 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onUpdate }) => {
     }
   };
 
-  const handleComment = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleComment = async (event: React.FormEvent) => {
+    event.preventDefault();
     if (!user || !newComment.trim()) return;
 
     setLoading(true);
@@ -72,13 +71,13 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onUpdate }) => {
         return;
       }
 
-      await supabase
-        .from('comments')
-        .insert([{
+      await supabase.from('comments').insert([
+        {
           post_id: post.id,
           user_id: user.id,
-          content: newComment.trim(),
-        }]);
+          content: newComment.trim()
+        }
+      ]);
 
       setNewComment('');
       onUpdate();
@@ -91,7 +90,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onUpdate }) => {
 
   const handleReport = async () => {
     if (!user) return;
-    
+
     const reason = prompt('Please specify the reason for reporting this post:');
     if (!reason) return;
 
@@ -101,13 +100,13 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onUpdate }) => {
         return;
       }
 
-      await supabase
-        .from('post_reports')
-        .insert([{
+      await supabase.from('post_reports').insert([
+        {
           post_id: post.id,
           reported_by: user.id,
-          reason: reason.trim(),
-        }]);
+          reason: reason.trim()
+        }
+      ]);
 
       toast('Post reported. Our moderation team will review it.', 'info');
     } catch (error) {
@@ -119,7 +118,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onUpdate }) => {
     const date = new Date(dateString);
     const now = new Date();
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-    
+
     if (diffInHours < 1) return 'Just now';
     if (diffInHours < 24) return `${diffInHours}h ago`;
     if (diffInHours < 168) return `${Math.floor(diffInHours / 24)}d ago`;
@@ -127,82 +126,75 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onUpdate }) => {
   };
 
   const attachments: PostMedia[] = Array.isArray(post.media) ? post.media : [];
+  const displayName = post.user?.spiritual_name || post.user?.full_name || 'Anonymous';
+  const avatarFallback = (post.user?.spiritual_name || post.user?.full_name || 'U').charAt(0);
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-4">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center space-x-3">
+    <Card padding="md" className="space-y-5">
+      <header className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
           {post.user?.avatar_url ? (
             <img
               src={post.user.avatar_url}
-              alt={post.user.full_name ?? 'Profile'}
-              className="w-10 h-10 rounded-full object-cover border border-gray-200"
+              alt={displayName}
+              className="h-12 w-12 rounded-full border border-sand-100 object-cover"
             />
           ) : (
-            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold">
-              {(post.user?.spiritual_name || post.user?.full_name || 'U').charAt(0)}
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-base font-semibold text-white">
+              {avatarFallback}
             </div>
           )}
-          <div>
-            <h3 className="font-semibold text-gray-900">
-              {post.user?.spiritual_name || post.user?.full_name || 'Anonymous'}
-            </h3>
-            <div className="flex items-center space-x-2 text-sm text-gray-500">
-              <span>{post.user?.spiritual_path}</span>
-              <span>•</span>
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold text-sand-900">{displayName}</h3>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-sand-500">
+              {post.user?.spiritual_path && <span>{post.user.spiritual_path}</span>}
               <span>{formatTime(post.created_at)}</span>
-              {post.moderation_status === 'pending' && (
-                <>
-                  <span>•</span>
-                  <span className="text-orange-600">Pending Review</span>
-                </>
-              )}
+              {post.moderation_status === 'pending' && <Badge tone="neutral" size="sm">Pending review</Badge>}
             </div>
           </div>
         </div>
-        
-        <div className="flex items-center space-x-2">
-          {topic && (
-            <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">
-              {topic.name}
-            </span>
-          )}
+        <div className="flex items-center gap-2">
+          {topic && <Badge tone="brand" size="sm">#{topic.name}</Badge>}
           <Button variant="ghost" size="sm" onClick={handleReport}>
-            <Flag className="w-4 h-4" />
+            <Flag className="h-4 w-4" />
           </Button>
         </div>
-      </div>
+      </header>
 
-      {/* Content */}
-      <div className="mb-4 space-y-3">
-        <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">
-          {post.content}
-        </p>
+      <section className="space-y-3">
+        <p className="text-sm leading-relaxed text-sand-700 whitespace-pre-wrap">{post.content}</p>
 
         {attachments.length > 0 && (
           <div className={`grid gap-3 ${attachments.length > 1 ? 'sm:grid-cols-2' : ''}`}>
             {attachments.map((media) => {
               if (!media.url) {
                 return (
-                  <div key={media.id} className="flex items-center justify-center h-48 bg-gray-100 text-gray-400 rounded-lg border border-dashed">
-                    <ImageOff className="w-6 h-6" />
+                  <div
+                    key={media.id}
+                    className="flex h-48 items-center justify-center rounded-2xl border border-dashed border-sand-200 bg-sand-25 text-sand-400"
+                  >
+                    <ImageOff className="h-6 w-6" />
                   </div>
                 );
               }
-              return media.media_type === 'video' ? (
-                <video
-                  key={media.id}
-                  className="w-full h-48 rounded-lg border border-gray-200 object-cover bg-black"
-                  controls
-                  src={media.url}
-                />
-              ) : (
+
+              if ((media as any).type === 'video' || (media as any).media_type === 'video') {
+                return (
+                  <video
+                    key={media.id}
+                    className="max-h-[512px] w-full rounded-2xl border border-sand-100 bg-black object-contain"
+                    controls
+                    src={media.url}
+                  />
+                );
+              }
+
+              return (
                 <img
                   key={media.id}
                   src={media.url}
                   alt={media.metadata?.originalName?.toString() ?? 'Post attachment'}
-                  className="w-full h-48 rounded-lg border border-gray-200 object-cover"
+                  className="max-h-[512px] w-full rounded-2xl border border-sand-100 object-contain"
                   loading="lazy"
                 />
               );
@@ -211,80 +203,67 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onUpdate }) => {
         )}
 
         {safeTags.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-1">
+          <div className="mt-2 flex flex-wrap gap-2">
             {safeTags.map((tag, index) => (
-              <span
-                key={index}
-                className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-md"
-              >
-                #{tag}
-              </span>
+              <Badge key={index} tone="neutral" size="sm">#{tag}</Badge>
             ))}
           </div>
         )}
-      </div>
+      </section>
 
-      {/* Actions */}
-      <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-        <div className="flex items-center space-x-6">
+      <div className="soft-divider" />
+
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-5">
           <button
             onClick={handleLike}
-            className={`flex items-center space-x-2 transition-colors ${
-              liked ? 'text-red-600' : 'text-gray-500 hover:text-red-600'
+            className={`flex items-center gap-2 text-sm font-medium transition ${
+              liked ? 'text-brand-600' : 'text-sand-500 hover:text-brand-600'
             }`}
+            disabled={likeLoading}
           >
-            <Heart className={`w-5 h-5 ${liked ? 'fill-current' : ''}`} />
-            <span className="text-sm">{likes}</span>
+            <Heart className={`h-5 w-5 ${liked ? 'fill-current' : ''}`} />
+            <span>{likes}</span>
           </button>
-          
+
           <button
-            onClick={() => setShowComments(!showComments)}
-            className="flex items-center space-x-2 text-gray-500 hover:text-blue-600 transition-colors"
+            onClick={() => setShowComments((prev) => !prev)}
+            className="flex items-center gap-2 text-sm font-medium text-sand-500 transition hover:text-moss-600"
           >
-            <MessageCircle className="w-5 h-5" />
-            <span className="text-sm">{comments}</span>
+            <MessageCircle className="h-5 w-5" />
+            <span>{comments}</span>
           </button>
-          
-          <button className="flex items-center space-x-2 text-gray-500 hover:text-green-600 transition-colors">
-            <Share2 className="w-5 h-5" />
-            <span className="text-sm">{shares}</span>
+
+          <button className="flex items-center gap-2 text-sm font-medium text-sand-500 transition hover:text-sand-700">
+            <Share2 className="h-5 w-5" />
+            <span>{shares}</span>
           </button>
         </div>
       </div>
 
-      {/* Comments Section */}
       {showComments && (
-        <div className="mt-4 pt-4 border-t border-gray-100">
-          <form onSubmit={handleComment} className="mb-4">
-            <div className="flex space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center text-white text-sm font-semibold">
-                {(user?.spiritual_name || user?.full_name || 'U').charAt(0)}
-              </div>
-              <div className="flex-1">
-                <input
-                  type="text"
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  placeholder="Share your thoughts respectfully..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                />
-              </div>
-              <Button
-                type="submit"
-                size="sm"
-                loading={loading}
-                disabled={!newComment.trim()}
-              >
-                Reply
-              </Button>
+        <div className="space-y-4 rounded-2xl border border-sand-100 bg-sand-25/80 p-4">
+          <form onSubmit={handleComment} className="flex flex-wrap items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-xs font-semibold text-white">
+              {(user?.spiritual_name || user?.full_name || 'U').charAt(0)}
             </div>
+            <input
+              type="text"
+              value={newComment}
+              onChange={(event) => setNewComment(event.target.value)}
+              placeholder="Share your thoughts respectfully..."
+              className="flex-1 rounded-full border border-sand-200 px-4 py-2 text-sm text-sand-700 focus:outline-none focus:ring-2 focus:ring-brand-200"
+            />
+            <Button type="submit" size="sm" loading={loading} disabled={!newComment.trim()}>
+              Reply
+            </Button>
           </form>
-          
-          <div className="text-sm text-gray-500 text-center py-4">
-            Comments will be loaded here once the backend is fully connected
-          </div>
+
+          <p className="text-center text-xs text-sand-500">
+            Comments will appear here once the backend is connected.
+          </p>
         </div>
       )}
-    </div>
+    </Card>
   );
 };

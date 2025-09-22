@@ -47,6 +47,8 @@ export class GenerateAvatarUploadUrlUseCase {
       };
     }
 
+    await this.ensureBucket(this.deps.bucket);
+
     const storage = this.deps.storageClient.storage.from(this.deps.bucket);
     const { data, error } = await storage.createSignedUploadUrl(objectPath, { upsert: true });
 
@@ -65,5 +67,18 @@ export class GenerateAvatarUploadUrlUseCase {
       publicUrl: publicUrlData?.publicUrl ?? null,
       path: objectPath
     };
+  }
+
+  private async ensureBucket(bucket: string): Promise<void> {
+    if (!this.deps.storageClient) return;
+
+    const storageAdmin = this.deps.storageClient.storage;
+    const { error } = await storageAdmin.createBucket(bucket, { public: true });
+
+    if (error && !/exists/i.test(error.message)) {
+      throw new Error(`Failed to create bucket ${bucket}: ${error.message}`);
+    }
+
+    await storageAdmin.updateBucket(bucket, { public: true });
   }
 }

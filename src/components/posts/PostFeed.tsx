@@ -114,17 +114,17 @@ export const PostFeed: React.FC<PostFeedProps> = ({ topicFilter, onTopicFilterCl
     return (
       <div className="space-y-4">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 animate-pulse">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-10 h-10 bg-gray-300 rounded-full" />
+          <div key={i} className="card p-6 animate-pulse">
+            <div className="mb-4 flex items-center space-x-3">
+              <div className="h-10 w-10 rounded-full bg-sand-200" />
               <div className="space-y-2">
-                <div className="h-4 bg-gray-300 rounded w-32" />
-                <div className="h-3 bg-gray-300 rounded w-24" />
+                <div className="h-4 w-32 rounded bg-sand-200" />
+                <div className="h-3 w-24 rounded bg-sand-200" />
               </div>
             </div>
             <div className="space-y-2">
-              <div className="h-4 bg-gray-300 rounded" />
-              <div className="h-4 bg-gray-300 rounded w-3/4" />
+              <div className="h-4 rounded bg-sand-200" />
+              <div className="h-4 w-3/4 rounded bg-sand-200" />
             </div>
           </div>
         ))}
@@ -137,7 +137,7 @@ export const PostFeed: React.FC<PostFeedProps> = ({ topicFilter, onTopicFilterCl
       <CreatePost onPostCreated={handlePostCreated} />
 
       {topicFilter && (
-        <div className="mb-4 px-3 py-2 bg-blue-50 border border-blue-200 rounded flex items-center justify-between text-sm text-blue-800">
+        <div className="mb-4 flex items-center justify-between rounded-2xl border border-brand-100 bg-brand-50/70 px-3 py-2 text-sm text-brand-800">
           <span>
             Filtering posts by <span className="font-semibold">#{topicFilter}</span>
           </span>
@@ -145,7 +145,7 @@ export const PostFeed: React.FC<PostFeedProps> = ({ topicFilter, onTopicFilterCl
             <button
               type="button"
               onClick={onTopicFilterClear}
-              className="text-xs font-medium text-blue-700 hover:underline"
+              className="text-xs font-medium text-brand-600 hover:underline"
             >
               Clear filter
             </button>
@@ -154,19 +154,23 @@ export const PostFeed: React.FC<PostFeedProps> = ({ topicFilter, onTopicFilterCl
       )}
 
       <div className="mb-4">
-        <div className="inline-flex bg-gray-100 rounded-lg p-1">
+        <div className="inline-flex rounded-full bg-sand-100/70 p-1">
           <button
             onClick={() => setActiveTab('all')}
-            className={`px-4 py-1.5 text-sm rounded-md ${
-              activeTab === 'all' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-600 hover:text-gray-800'
+            className={`rounded-full px-4 py-1.5 text-sm transition ${
+              activeTab === 'all'
+                ? 'bg-white text-sand-900 shadow-sm'
+                : 'text-sand-600 hover:text-sand-800'
             }`}
           >
             All Posts
           </button>
           <button
             onClick={() => setActiveTab('mine')}
-            className={`px-4 py-1.5 text-sm rounded-md ${
-              activeTab === 'mine' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-600 hover:text-gray-800'
+            className={`rounded-full px-4 py-1.5 text-sm transition ${
+              activeTab === 'mine'
+                ? 'bg-white text-sand-900 shadow-sm'
+                : 'text-sand-600 hover:text-sand-800'
             }`}
             disabled={!(user || session)}
           >
@@ -176,7 +180,7 @@ export const PostFeed: React.FC<PostFeedProps> = ({ topicFilter, onTopicFilterCl
       </div>
 
       {usingSample && (
-        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded">
+        <div className="mb-4 rounded-2xl border border-sand-200 bg-sand-25 p-3 text-sand-700">
           Showing sample posts (live data unavailable). Check API connectivity or backend status.
         </div>
       )}
@@ -187,12 +191,12 @@ export const PostFeed: React.FC<PostFeedProps> = ({ topicFilter, onTopicFilterCl
         ))}
 
         {posts.length === 0 && (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="py-12 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-brand-100 bg-brand-50 text-brand-600">
               <span className="text-2xl">🕉️</span>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No posts yet</h3>
-            <p className="text-gray-500">Be the first to share your spiritual insights with the community!</p>
+            <h3 className="mb-2 text-lg font-medium text-sand-900">No posts yet</h3>
+            <p className="text-sand-600">Be the first to share your spiritual insights with the community!</p>
           </div>
         )}
       </div>
