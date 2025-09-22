@@ -3,6 +3,7 @@ import { logger } from './logger.js';
 import { InMemoryUserRepository } from '../infrastructure/persistence/in-memory/in-memory-user.repository.js';
 import { InMemoryPostRepository } from '../infrastructure/persistence/in-memory/in-memory-post.repository.js';
 import { InMemoryAiOrchestrator } from '../infrastructure/ai/in-memory-orchestrator.js';
+import { SupabaseAiOrchestrator } from '../infrastructure/ai/supabase-orchestrator.js';
 import { SupabaseUserRepository } from '../infrastructure/persistence/supabase/supabase-user.repository.js';
 import { SupabasePostRepository } from '../infrastructure/persistence/supabase/supabase-post.repository.js';
 import { RegisterUserUseCase } from '../app/use-cases/auth/register-user.js';
@@ -29,6 +30,7 @@ import { FollowUserUseCase } from '../app/use-cases/users/follow-user.js';
 import { UnfollowUserUseCase } from '../app/use-cases/users/unfollow-user.js';
 import { GenerateAvatarUploadUrlUseCase } from '../app/use-cases/users/generate-avatar-upload-url.js';
 import { UpdateUserAvatarUseCase } from '../app/use-cases/users/update-user-avatar.js';
+import { ContentModerationService } from '../app/services/content-moderation.service.js';
 
 export type ServiceFactory<T> = (container: Container) => Promise<T> | T;
 
@@ -103,23 +105,27 @@ export async function createContainer({ config }: ContainerOptions): Promise<Con
     config.supabaseUrl && config.supabaseServiceRoleKey
       ? new SupabasePostRepository(config)
       : new InMemoryPostRepository();
-  const aiOrchestrator = new InMemoryAiOrchestrator();
   const supabaseClient =
     config.supabaseUrl && config.supabaseServiceRoleKey
       ? getSupabaseClient(config)
       : undefined;
+  const aiOrchestrator = supabaseClient
+    ? new SupabaseAiOrchestrator({ supabaseClient })
+    : new InMemoryAiOrchestrator();
   const postMediaBucket = config.postMediaBucket ?? 'post-media';
   const experienceSvc = new ExperienceService(supabaseClient);
+  const moderationService = new ContentModerationService(supabaseClient);
 
   container.register('repo.user', () => userRepository);
   container.register('repo.post', () => postRepository);
   container.register('ai.orchestrator', () => aiOrchestrator);
   container.register('service.experience', () => experienceSvc);
+  container.register('service.moderation', () => moderationService);
 
   container.register('usecase.user.register', () => new RegisterUserUseCase(userRepository));
   container.register(
     'usecase.post.create',
-    () => new CreatePostUseCase(postRepository, aiOrchestrator),
+    () => new CreatePostUseCase(postRepository, aiOrchestrator, moderationService),
   );
   container.register('usecase.post.listUser', () => new ListUserPostsUseCase(postRepository));
   container.register(

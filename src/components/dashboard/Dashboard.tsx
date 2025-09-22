@@ -6,6 +6,7 @@ import { Header } from '../layout/Header';
 import { Welcome } from './Welcome';
 import { PostFeed } from '../posts/PostFeed';
 import { DevotionTracker } from './DevotionTracker';
+import { GuidancePanel } from './GuidancePanel';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../ui/Toast';
 import { api, queryKeys, type SuggestedConnection, type TrendingTopic, type EventItem } from '../../lib/api';
@@ -501,6 +502,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             </div>
 
             <DevotionTracker />
+
+            <GuidancePanel />
           </div>
         </div>
       </main>

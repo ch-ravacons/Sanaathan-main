@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { PostRepository } from '../../../domain/posts/post.repository.js';
 import type { AiOrchestrator } from '../../../domain/ai/orchestrator.js';
 import { Post } from '../../../domain/posts/post.entity.js';
+import type { ContentModerationService } from '../../services/content-moderation.service.js';
 
 export interface CreatePostInput {
   userId: string;
@@ -13,10 +14,14 @@ export interface CreatePostInput {
 }
 
 export class CreatePostUseCase {
-  constructor(private readonly posts: PostRepository, private readonly ai: AiOrchestrator) {}
+  constructor(
+    private readonly posts: PostRepository,
+    private readonly ai: AiOrchestrator,
+    private readonly moderation: ContentModerationService
+  ) {}
 
   async execute(input: CreatePostInput): Promise<Post> {
-    const post = await this.posts.create({
+    let post = await this.posts.create({
       id: randomUUID(),
       userId: input.userId,
       content: input.content,
@@ -42,6 +47,16 @@ export class CreatePostUseCase {
         createdAt: new Date()
       }
     });
+
+    const moderation = await this.moderation.moderatePost({
+      postId: post.id,
+      userId: input.userId,
+      content: input.content
+    });
+
+    if (moderation.status !== post.toJSON().moderationStatus) {
+      post = new Post({ ...post.toJSON(), moderationStatus: moderation.status });
+    }
 
     return post;
   }
