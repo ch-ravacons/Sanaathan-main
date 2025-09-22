@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
+import { useEffect } from 'react';
 import { Send, AlertCircle, CheckCircle, Lightbulb, Paperclip, XCircle } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Select } from '../ui/Select';
@@ -69,6 +70,12 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
     setAttachments((prev) => [...prev, ...toAdd]);
     event.target.value = '';
   }, [attachments.length, toast]);
+
+  useEffect(() => {
+    return () => {
+      attachments.forEach((attachment) => URL.revokeObjectURL(attachment.preview));
+    };
+  }, [attachments]);
 
   const handleRemoveAttachment = useCallback((index: number) => {
     setAttachments((prev) => {

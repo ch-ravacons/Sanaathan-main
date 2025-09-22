@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BookOpen, Users, Calendar, Heart, Check, UserPlus, MapPin, CalendarClock } from 'lucide-react';
 
@@ -118,8 +118,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   ]);
 
   const trendingTopics: TrendingTopic[] = trendingQuery.data?.topics ?? [];
+  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const suggestedConnections: SuggestedConnection[] = suggestionsQuery.data?.suggestions ?? [];
   const events: EventItem[] = eventsQuery.data?.events ?? [];
+  const connectionsToShow = useMemo(
+    () => suggestedConnections.filter((connection) => connection.id !== user?.id),
+    [suggestedConnections, user?.id]
+  );
+  const devotionSummary = devotionSummaryQuery.data?.summary;
+  const devotionMeter = devotionSummary?.meter ?? 0;
 
   const followMutation = useMutation({
     mutationFn: (input: { followerId: string; followeeId: string }) => api.followUser(input),
@@ -228,12 +235,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     markReadingMutation.mutate();
   };
 
+  const handleTrendingSelect = (topic: string) => {
+    setSelectedTopic((prev) => (prev === topic ? null : topic));
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header onProfile={() => onNavigate('profile')} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Welcome />
+
+        {user && devotionSummary && (
+          <div className="mb-6 bg-white border border-orange-100 rounded-lg shadow-sm p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-semibold text-orange-700">Spiritual Meter</span>
+              <span className="text-xs font-medium text-orange-600">{devotionMeter}%</span>
+            </div>
+            <div className="w-full h-2 rounded-full bg-orange-100 overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-orange-500 to-red-500 transition-all duration-500"
+                style={{ width: `${Math.min(Math.max(devotionMeter, 0), 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           <div className="lg:col-span-3">
@@ -250,7 +276,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
               ))}
             </div>
 
-            <PostFeed />
+            <PostFeed topicFilter={selectedTopic} onTopicFilterClear={() => setSelectedTopic(null)} />
           </div>
 
           <div className="lg:col-span-1 space-y-6">
@@ -299,12 +325,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                 {!trendingQuery.isLoading && trendingTopics.length === 0 && (
                   <div className="text-sm text-gray-500">No trending topics yet</div>
                 )}
-                {trendingTopics.map((topic) => (
-                  <div key={topic.topic} className="flex items-center justify-between">
-                    <span className="text-sm text-gray-700">#{topic.topic}</span>
-                    <span className="text-xs text-gray-500">{topic.post_count} posts</span>
-                  </div>
-                ))}
+                {trendingTopics.map((topic) => {
+                  const isActive = selectedTopic === topic.topic;
+                  return (
+                    <button
+                      type="button"
+                      key={topic.topic}
+                      onClick={() => handleTrendingSelect(topic.topic)}
+                      className={`w-full flex items-center justify-between px-2 py-1 rounded ${
+                        isActive ? 'bg-orange-50 text-orange-700 border border-orange-200' : 'hover:bg-gray-50 text-gray-700'
+                      }`}
+                    >
+                      <span className="text-sm">#{topic.topic}</span>
+                      <span className="text-xs text-gray-500">{topic.post_count} posts</span>
+                    </button>
+                  );
+                })}
+                {selectedTopic && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTopic(null)}
+                    className="text-xs text-orange-600 hover:text-orange-700 font-medium"
+                  >
+                    Clear filter
+                  </button>
+                )}
               </div>
             </div>
 
@@ -333,10 +378,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                 {suggestionsQuery.isError && (
                   <div className="text-sm text-red-500">Unable to load suggestions right now.</div>
                 )}
-                {!suggestionsQuery.isLoading && user && suggestedConnections.length === 0 && !suggestionsQuery.isError && (
+                {!suggestionsQuery.isLoading && user && connectionsToShow.length === 0 && !suggestionsQuery.isError && (
                   <div className="text-sm text-gray-500">No suggestions yet</div>
                 )}
-                {suggestedConnections.map((connection) => {
+                {connectionsToShow.map((connection) => {
                   const isFollowPending =
                     (followMutation.isPending && followMutation.variables?.followeeId === connection.id) ||
                     (unfollowMutation.isPending && unfollowMutation.variables?.followeeId === connection.id);

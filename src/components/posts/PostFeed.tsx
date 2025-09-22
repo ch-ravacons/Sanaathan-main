@@ -12,7 +12,12 @@ const generateClientId = () =>
     ? globalThis.crypto.randomUUID()
     : Math.random().toString(36).slice(2);
 
-export const PostFeed: React.FC = () => {
+interface PostFeedProps {
+  topicFilter?: string | null;
+  onTopicFilterClear?: () => void;
+}
+
+export const PostFeed: React.FC<PostFeedProps> = ({ topicFilter, onTopicFilterClear }) => {
   const { user, session } = useAuth();
   const { toast } = useToast();
   const [posts, setPosts] = useState<Post[]>(samplePosts);
@@ -72,6 +77,16 @@ export const PostFeed: React.FC = () => {
         transformedPosts = [...preferred, ...others];
       }
 
+      if (topicFilter) {
+        const filter = topicFilter.toLowerCase();
+        transformedPosts = transformedPosts.filter((post) => {
+          const tags = Array.isArray(post.tags) ? post.tags : [];
+          const topicMatch = (post.spiritual_topic ?? '').toLowerCase() === filter;
+          const tagMatch = tags.some((tag) => tag.toLowerCase() === filter);
+          return topicMatch || tagMatch;
+        });
+      }
+
       setPosts(transformedPosts);
       setUsingSample(false);
     } catch (error) {
@@ -81,7 +96,7 @@ export const PostFeed: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, effectiveUserId, interestsKey, toast]);
+  }, [activeTab, effectiveUserId, interestsKey, toast, topicFilter]);
 
   useEffect(() => {
     fetchPosts();
@@ -120,6 +135,23 @@ export const PostFeed: React.FC = () => {
   return (
     <div>
       <CreatePost onPostCreated={handlePostCreated} />
+
+      {topicFilter && (
+        <div className="mb-4 px-3 py-2 bg-blue-50 border border-blue-200 rounded flex items-center justify-between text-sm text-blue-800">
+          <span>
+            Filtering posts by <span className="font-semibold">#{topicFilter}</span>
+          </span>
+          {onTopicFilterClear && (
+            <button
+              type="button"
+              onClick={onTopicFilterClear}
+              className="text-xs font-medium text-blue-700 hover:underline"
+            >
+              Clear filter
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="mb-4">
         <div className="inline-flex bg-gray-100 rounded-lg p-1">
@@ -193,6 +225,7 @@ const samplePosts: Post[] = [
       spiritual_path: 'Advaita Vedanta',
       interests: ['upanishads', 'meditation'],
       path_practices: ['Meditation', 'Self-Inquiry'],
+      avatar_url: null,
       created_at: '',
       updated_at: '',
     },
@@ -220,6 +253,7 @@ const samplePosts: Post[] = [
       spiritual_path: 'Shakteya',
       interests: ['festivals', 'bhakti'],
       path_practices: ['Devi Puja', 'Mantra'],
+      avatar_url: null,
       created_at: '',
       updated_at: '',
     },

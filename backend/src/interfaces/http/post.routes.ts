@@ -81,7 +81,8 @@ function adaptPost(post: Post) {
           email: json.author.email,
           full_name: json.author.fullName,
           spiritual_name: json.author.spiritualName ?? null,
-          spiritual_path: json.author.spiritualPath ?? null
+          spiritual_path: json.author.spiritualPath ?? null,
+          avatar_url: json.author.avatarUrl ?? null
         }
       : undefined,
     media: (json.media ?? []).map((item) => ({

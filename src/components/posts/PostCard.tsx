@@ -133,9 +133,17 @@ export const PostCard: React.FC<PostCardProps> = ({ post, onUpdate }) => {
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold">
-            {(post.user?.spiritual_name || post.user?.full_name || 'U').charAt(0)}
-          </div>
+          {post.user?.avatar_url ? (
+            <img
+              src={post.user.avatar_url}
+              alt={post.user.full_name ?? 'Profile'}
+              className="w-10 h-10 rounded-full object-cover border border-gray-200"
+            />
+          ) : (
+            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold">
+              {(post.user?.spiritual_name || post.user?.full_name || 'U').charAt(0)}
+            </div>
+          )}
           <div>
             <h3 className="font-semibold text-gray-900">
               {post.user?.spiritual_name || post.user?.full_name || 'Anonymous'}

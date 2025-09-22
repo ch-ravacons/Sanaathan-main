@@ -151,6 +151,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             interests: [],
             spiritual_path: '',
             path_practices: [],
+            avatar_url: authUser.user_metadata?.avatar_url ?? null,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           } as User;
@@ -181,6 +182,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           interests: [],
           spiritual_path: '',
           path_practices: [],
+          avatar_url: authUser.user_metadata?.avatar_url ?? null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         } as User;

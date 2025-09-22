@@ -27,6 +27,8 @@ import { LogDevotionPracticeUseCase } from '../app/use-cases/devotion/log-practi
 import { GetDevotionSummaryUseCase } from '../app/use-cases/devotion/get-summary.js';
 import { FollowUserUseCase } from '../app/use-cases/users/follow-user.js';
 import { UnfollowUserUseCase } from '../app/use-cases/users/unfollow-user.js';
+import { GenerateAvatarUploadUrlUseCase } from '../app/use-cases/users/generate-avatar-upload-url.js';
+import { UpdateUserAvatarUseCase } from '../app/use-cases/users/update-user-avatar.js';
 
 export type ServiceFactory<T> = (container: Container) => Promise<T> | T;
 
@@ -138,6 +140,14 @@ export async function createContainer({ config }: ContainerOptions): Promise<Con
   container.register(
     'usecase.post.generateUploadUrl',
     () => new GenerateMediaUploadUrlUseCase({ storageClient: supabaseClient, bucket: postMediaBucket })
+  );
+  container.register(
+    'usecase.user.avatarUploadUrl',
+    () => new GenerateAvatarUploadUrlUseCase({ storageClient: supabaseClient, bucket: config.profilePhotoBucket })
+  );
+  container.register(
+    'usecase.user.updateAvatar',
+    () => new UpdateUserAvatarUseCase(userRepository, supabaseClient)
   );
   container.register(
     'usecase.reading.getDaily',

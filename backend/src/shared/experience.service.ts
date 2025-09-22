@@ -327,7 +327,7 @@ export class ExperienceService {
 
         let query = this.client
           .from('users')
-          .select('id, full_name, spiritual_path, location, interests')
+          .select('id, full_name, spiritual_path, location, interests, avatar_url')
           .order('updated_at', { ascending: false })
           .limit(Math.max(limit * 3, limit));
 
@@ -373,7 +373,7 @@ export class ExperienceService {
                 location: candidate.location ?? null,
                 shared_interests: shared,
                 mutual_followers: mutualCounts.get(candidate.id) ?? 0,
-                avatar_url: null,
+                avatar_url: candidate.avatar_url ?? null,
                 is_following: followingIds.includes(candidate.id)
               } satisfies SuggestedConnectionDto;
             })

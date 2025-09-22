@@ -13,6 +13,7 @@ export interface PostProps {
     fullName: string;
     spiritualName?: string | null;
     spiritualPath?: string | null;
+    avatarUrl?: string | null;
   };
   likesCount?: number;
   commentsCount?: number;

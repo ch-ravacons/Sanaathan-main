@@ -124,6 +124,20 @@ CREATE TRIGGER devotion_practices_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
+INSERT INTO devotion_practices (id, name, description, category, base_points, icon)
+VALUES
+  ('practice-1', 'Japa Meditation', '108 mantra repetitions', 'meditation', 20, NULL),
+  ('practice-2', 'Scripture Reading', 'Read for at least 15 minutes', 'study', 15, NULL),
+  ('practice-3', 'Seva', 'Offer service to the temple/community', 'service', 25, NULL),
+  ('practice-4', 'Kirtan', 'Lead or participate in a kirtan session', 'devotion', 30, NULL)
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
+  description = EXCLUDED.description,
+  category = EXCLUDED.category,
+  base_points = EXCLUDED.base_points,
+  icon = EXCLUDED.icon,
+  updated_at = now();
+
 ALTER TABLE practice_logs
   ADD COLUMN IF NOT EXISTS intensity       text,
   ADD COLUMN IF NOT EXISTS notes           text,

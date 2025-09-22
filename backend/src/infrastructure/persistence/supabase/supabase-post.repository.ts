@@ -22,6 +22,7 @@ interface PostRow {
     full_name: string;
     spiritual_name?: string | null;
     spiritual_path?: string | null;
+    avatar_url?: string | null;
   } | null;
   post_media?: Array<{
     id: string;
@@ -63,7 +64,8 @@ function mapRow(row: PostRow): Post {
           email: row.users.email,
           fullName: row.users.full_name,
           spiritualName: row.users.spiritual_name ?? null,
-          spiritualPath: row.users.spiritual_path ?? null
+          spiritualPath: row.users.spiritual_path ?? null,
+          avatarUrl: row.users.avatar_url ?? null
         }
       : undefined,
     media
@@ -88,7 +90,7 @@ export class SupabasePostRepository implements PostRepository {
         tags: input.tags ?? [],
         moderation_status: input.moderationStatus ?? 'pending'
       })
-      .select(`*, users(id, email, full_name, spiritual_name, spiritual_path), post_media(id, media_type, metadata, media_uploads(url, storage_bucket, metadata))`)
+      .select(`*, users(*), post_media(id, media_type, metadata, media_uploads(url, storage_bucket, metadata))`)
       .single<PostRow>();
 
     if (error || !data) {
@@ -125,7 +127,7 @@ export class SupabasePostRepository implements PostRepository {
   async listRecentByUser(userId: string, limit: number): Promise<Post[]> {
     const { data, error } = await this.client
       .from('posts')
-      .select(`*, users(id, email, full_name, spiritual_name, spiritual_path), post_media(id, media_type, metadata, media_uploads(url, storage_bucket, metadata))`)
+      .select(`*, users(*), post_media(id, media_type, metadata, media_uploads(url, storage_bucket, metadata))`)
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(limit);
@@ -140,7 +142,7 @@ export class SupabasePostRepository implements PostRepository {
   async listPublicFeed(limit: number): Promise<Post[]> {
     const { data, error } = await this.client
       .from('posts')
-      .select(`*, users(id, email, full_name, spiritual_name, spiritual_path), post_media(id, media_type, metadata, media_uploads(url, storage_bucket, metadata))`)
+      .select(`*, users(*), post_media(id, media_type, metadata, media_uploads(url, storage_bucket, metadata))`)
       .eq('moderation_status', 'approved')
       .order('created_at', { ascending: false })
       .limit(limit);

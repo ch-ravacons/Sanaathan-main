@@ -302,6 +302,22 @@ export const api = {
     });
   },
 
+  async getAvatarUploadUrl(params: { userId: string; fileName: string }) {
+    return request('/api/v1/users/avatar/upload-url', UploadUrlResponseSchema, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params)
+    });
+  },
+
+  async updateUserAvatar(params: { userId: string; avatarUrl: string }) {
+    return request(`/api/v1/users/${params.userId}/avatar`, undefined, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ avatarUrl: params.avatarUrl })
+    });
+  },
+
   async getTrendingTopics(params: { window?: string; limit?: number }) {
     const query = buildQuery({ window: params.window, limit: params.limit });
     return request(`/api/v1/posts/trending${query}`, TrendingTopicsResponseSchema);

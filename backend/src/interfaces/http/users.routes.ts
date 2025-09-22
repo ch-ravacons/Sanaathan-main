@@ -4,6 +4,8 @@ import { z } from 'zod';
 import type { ListSuggestedConnectionsUseCase } from '../../app/use-cases/users/list-suggested-connections.js';
 import type { FollowUserUseCase } from '../../app/use-cases/users/follow-user.js';
 import type { UnfollowUserUseCase } from '../../app/use-cases/users/unfollow-user.js';
+import type { GenerateAvatarUploadUrlUseCase } from '../../app/use-cases/users/generate-avatar-upload-url.js';
+import type { UpdateUserAvatarUseCase } from '../../app/use-cases/users/update-user-avatar.js';
 
 const SuggestionQuerySchema = z.object({
   userId: z.string().uuid().optional(),
@@ -13,6 +15,8 @@ const SuggestionQuerySchema = z.object({
 const FollowParamsSchema = z.object({ userId: z.string().uuid() });
 const FollowBodySchema = z.object({ followerId: z.string().uuid() });
 const FollowQuerySchema = z.object({ followerId: z.string().uuid().optional() });
+const AvatarUploadSchema = z.object({ userId: z.string().uuid(), fileName: z.string().min(3) });
+const UpdateAvatarSchema = z.object({ avatarUrl: z.string().url() });
 
 export async function registerUserRoutes(app: FastifyInstance, _opts: FastifyPluginOptions) {
   app.get('/suggestions', async (request) => {
@@ -40,6 +44,20 @@ export async function registerUserRoutes(app: FastifyInstance, _opts: FastifyPlu
     }
     const usecase = app.container.resolve<UnfollowUserUseCase>('usecase.user.unfollow');
     await usecase.execute({ followerId, followeeId: params.userId });
+    reply.code(204).send();
+  });
+
+  app.post('/avatar/upload-url', async (request) => {
+    const payload = AvatarUploadSchema.parse(request.body);
+    const usecase = app.container.resolve<GenerateAvatarUploadUrlUseCase>('usecase.user.avatarUploadUrl');
+    return usecase.execute(payload);
+  });
+
+  app.patch('/:userId/avatar', async (request, reply) => {
+    const params = FollowParamsSchema.parse(request.params);
+    const payload = UpdateAvatarSchema.parse(request.body);
+    const usecase = app.container.resolve<UpdateUserAvatarUseCase>('usecase.user.updateAvatar');
+    await usecase.execute({ userId: params.userId, avatarUrl: payload.avatarUrl });
     reply.code(204).send();
   });
 }

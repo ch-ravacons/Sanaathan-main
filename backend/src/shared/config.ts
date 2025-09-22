@@ -13,7 +13,8 @@ const ConfigSchema = z.object({
   anthropicApiKey: z.string().optional(),
   supabaseUrl: z.string().url().optional(),
   supabaseServiceRoleKey: z.string().optional(),
-  postMediaBucket: z.string().default('post-media')
+  postMediaBucket: z.string().default('post-media'),
+  profilePhotoBucket: z.string().default('profile-photos')
 });
 
 export type AppConfig = z.infer<typeof ConfigSchema>;
@@ -33,7 +34,8 @@ export function loadConfig(): AppConfig {
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,
     supabaseUrl: process.env.SUPABASE_URL,
     supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-    postMediaBucket: process.env.POST_MEDIA_BUCKET
+    postMediaBucket: process.env.POST_MEDIA_BUCKET,
+    profilePhotoBucket: process.env.PROFILE_PHOTO_BUCKET
   });
 
   if (!parsed.success) {

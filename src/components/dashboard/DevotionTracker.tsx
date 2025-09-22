@@ -51,9 +51,10 @@ export const DevotionTracker: React.FC = () => {
         notes: notes.trim() || undefined
       });
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast('Practice recorded. Keep shining! ✨', 'success');
       setNotes('');
+      queryClient.setQueryData(queryKeys.devotion.summary(user?.id ?? null), data);
       queryClient.invalidateQueries({ queryKey: queryKeys.devotion.summary(user?.id ?? null) });
     },
     onError: () => toast('Unable to log practice right now.', 'error')
