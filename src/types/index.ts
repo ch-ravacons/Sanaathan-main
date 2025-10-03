@@ -12,6 +12,19 @@ export interface User {
   path_practices: string[];
   bio?: string | null;
   avatar_url?: string | null;
+  vedic_qualifications?: string[];
+  spiritual_qualifications?: string[];
+  years_of_experience?: number | null;
+  areas_of_guidance?: string[];
+  languages_spoken?: string[];
+  availability?: string | null;
+  website?: string | null;
+  achievements?: string[];
+  offerings?: string[];
+  certifications?: string[];
+  introduction?: string | null;
+  whatsapp?: string | null;
+  linkedin?: string | null;
   created_at: string;
   updated_at: string;
 }

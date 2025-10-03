@@ -17,7 +17,10 @@ export class InMemoryPostRepository implements PostRepository {
       updatedAt: now,
       media: (input.media ?? []).map((item) => ({
         id: item.assetId,
-        url: `https://uploads.sanaathan.local/${input.userId}/${item.assetId}`,
+        url:
+          typeof item.metadata?.url === 'string' && item.metadata.url
+            ? item.metadata.url
+            : `https://uploads.sanaathan.local/${input.userId}/${item.assetId}`,
         mediaType: item.type,
         metadata: item.metadata ?? {}
       }))
@@ -38,5 +41,14 @@ export class InMemoryPostRepository implements PostRepository {
       .filter((post) => post.moderationStatus === 'approved')
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(0, limit);
+  }
+
+  async updateModerationStatus(
+    postId: string,
+    status: 'approved' | 'pending' | 'flagged' | 'rejected'
+  ): Promise<void> {
+    const current = this.items.get(postId);
+    if (!current) return;
+    this.items.set(postId, new Post({ ...current.toJSON(), moderationStatus: status }));
   }
 }

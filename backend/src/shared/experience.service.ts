@@ -11,6 +11,12 @@ export interface SuggestedConnectionDto {
   mutual_followers: number;
   avatar_url?: string | null;
   is_following: boolean;
+  vedic_qualifications?: string[];
+  spiritual_qualifications?: string[];
+  years_of_experience?: number | null;
+  areas_of_guidance?: string[];
+  languages_spoken?: string[];
+  introduction?: string | null;
 }
 
 export interface TrendingTopicDto {
@@ -40,6 +46,12 @@ export interface CommunityMemberDto {
   avatar_url?: string | null;
   location?: string | null;
   bio?: string | null;
+  vedic_qualifications?: string[];
+  spiritual_qualifications?: string[];
+  years_of_experience?: number | null;
+  areas_of_guidance?: string[];
+  languages_spoken?: string[];
+  introduction?: string | null;
 }
 
 export interface EventDto {
@@ -120,7 +132,13 @@ export class ExperienceService {
       mutual_followers: 3,
       avatar_url: null,
       is_following: false,
-      location: 'Vrindavan, India'
+      location: 'Vrindavan, India',
+      vedic_qualifications: ['Bhakti Shastri', 'Sanskrit Scholar'],
+      spiritual_qualifications: ['Initiated Guru'],
+      years_of_experience: 18,
+      areas_of_guidance: ['Devotional Practices', 'Scripture Study'],
+      languages_spoken: ['Hindi', 'English'],
+      introduction: 'Guiding seekers on the path of Bhakti for nearly two decades.'
     },
     {
       id: '61f26f41-45e9-4541-9358-7d6e8fec8591',
@@ -130,7 +148,13 @@ export class ExperienceService {
       mutual_followers: 5,
       avatar_url: null,
       is_following: false,
-      location: 'Chennai, India'
+      location: 'Chennai, India',
+      vedic_qualifications: ['Shakta Tantra Acharya'],
+      spiritual_qualifications: ['Navaratri Ritualist'],
+      years_of_experience: 12,
+      areas_of_guidance: ['Devi Worship', 'Ritual Arts'],
+      languages_spoken: ['Tamil', 'English'],
+      introduction: 'Priestess and scholar focusing on Devi traditions.'
     },
     {
       id: '97a54f0b-aa08-4f5f-b6e7-5444f8a6adcd',
@@ -140,7 +164,13 @@ export class ExperienceService {
       mutual_followers: 2,
       avatar_url: null,
       is_following: false,
-      location: 'Rishikesh, India'
+      location: 'Rishikesh, India',
+      vedic_qualifications: ['Advaita Vedanta Vidwan'],
+      spiritual_qualifications: ['Sanyasa Diksha'],
+      years_of_experience: 22,
+      areas_of_guidance: ['Jnana Yoga', 'Meditation'],
+      languages_spoken: ['Hindi', 'English', 'Sanskrit'],
+      introduction: 'Advaita teacher hosting retreats across the Himalayas.'
     },
     {
       id: '8f3f35af-b5bf-46ee-9ee6-8c3b4d138a88',
@@ -150,7 +180,13 @@ export class ExperienceService {
       mutual_followers: 4,
       avatar_url: null,
       is_following: false,
-      location: 'Kathmandu, Nepal'
+      location: 'Kathmandu, Nepal',
+      vedic_qualifications: ['Agama Shastra Pandit'],
+      spiritual_qualifications: ['Shaiva Guru'],
+      years_of_experience: 15,
+      areas_of_guidance: ['Shaiva Tantra', 'Sound Healing'],
+      languages_spoken: ['Nepali', 'English'],
+      introduction: 'Shaiva mentor blending mantra therapy with daily sadhana guidance.'
     }
   ];
 
@@ -221,7 +257,13 @@ export class ExperienceService {
       interests: ['Bhagavad Gita', 'Bhakti Yoga'],
       location: 'Bengaluru, India',
       avatar_url: null,
-      bio: 'Kirtan facilitator and Gita study circle host.'
+      bio: 'Kirtan facilitator and Gita study circle host.',
+      vedic_qualifications: ['Bhakti Shastri'],
+      spiritual_qualifications: ['Certified Kirtan Leader'],
+      years_of_experience: 9,
+      areas_of_guidance: ['Kirtan', 'Bhakti Study'],
+      languages_spoken: ['Kannada', 'English'],
+      introduction: 'Leads weekly satsangs for urban professionals.'
     },
     {
       id: 'community-2',
@@ -230,7 +272,12 @@ export class ExperienceService {
       interests: ['Mahashivratri', 'Rudram'],
       location: 'Coimbatore, India',
       avatar_url: null,
-      bio: 'Volunteer at Isha Foundation, passionate about Nada Yoga.'
+      bio: 'Volunteer at Isha Foundation, passionate about Nada Yoga.',
+      vedic_qualifications: ['Veda Pathashala Graduate'],
+      spiritual_qualifications: ['Isha Hatha Yoga Teacher'],
+      years_of_experience: 7,
+      areas_of_guidance: ['Hatha Yoga', 'Nada Yoga'],
+      languages_spoken: ['Tamil', 'English']
     },
     {
       id: 'community-3',
@@ -239,7 +286,12 @@ export class ExperienceService {
       interests: ['Sri Vidya', 'Devi Mahatmyam'],
       location: 'Kolkatta, India',
       avatar_url: null,
-      bio: 'Leads weekly lalita sahasranama chanting circles.'
+      bio: 'Leads weekly lalita sahasranama chanting circles.',
+      vedic_qualifications: ['Sri Vidya Upasaka'],
+      spiritual_qualifications: ['Devi Sadhana Guide'],
+      years_of_experience: 11,
+      areas_of_guidance: ['Chanting', 'Ritual Arts'],
+      languages_spoken: ['Bengali', 'Hindi', 'English']
     },
     {
       id: 'community-4',
@@ -248,7 +300,12 @@ export class ExperienceService {
       interests: ['Upanishads', 'Jnana Yoga'],
       location: 'Ahmedabad, India',
       avatar_url: null,
-      bio: 'Hosts Vedanta discussion groups for young seekers.'
+      bio: 'Hosts Vedanta discussion groups for young seekers.',
+      vedic_qualifications: ['Vedanta Acharya'],
+      spiritual_qualifications: ['Jnana Yoga Coach'],
+      years_of_experience: 10,
+      areas_of_guidance: ['Vedanta', 'Mindfulness'],
+      languages_spoken: ['Gujarati', 'Hindi', 'English']
     },
     {
       id: 'community-5',
@@ -257,7 +314,12 @@ export class ExperienceService {
       interests: ['Kirtan', 'Seva'],
       location: 'Hyderabad, India',
       avatar_url: null,
-      bio: 'Co-creates community seva opportunities with temple trusts.'
+      bio: 'Co-creates community seva opportunities with temple trusts.',
+      vedic_qualifications: ['Bhakti Vaibhava'],
+      spiritual_qualifications: ['Community Organizer'],
+      years_of_experience: 8,
+      areas_of_guidance: ['Seva Planning', 'Devotional Music'],
+      languages_spoken: ['Telugu', 'English']
     }
   ];
 
@@ -327,7 +389,9 @@ export class ExperienceService {
 
         let query = this.client
           .from('users')
-          .select('id, full_name, spiritual_path, location, interests, avatar_url')
+          .select(
+            'id, full_name, spiritual_path, location, interests, avatar_url, vedic_qualifications, spiritual_qualifications, years_of_experience, areas_of_guidance, languages_spoken, introduction'
+          )
           .order('updated_at', { ascending: false })
           .limit(Math.max(limit * 3, limit));
 
@@ -374,7 +438,21 @@ export class ExperienceService {
                 shared_interests: shared,
                 mutual_followers: mutualCounts.get(candidate.id) ?? 0,
                 avatar_url: candidate.avatar_url ?? null,
-                is_following: followingIds.includes(candidate.id)
+                is_following: followingIds.includes(candidate.id),
+                vedic_qualifications: Array.isArray(candidate.vedic_qualifications)
+                  ? candidate.vedic_qualifications
+                  : [],
+                spiritual_qualifications: Array.isArray(candidate.spiritual_qualifications)
+                  ? candidate.spiritual_qualifications
+                  : [],
+                years_of_experience: candidate.years_of_experience ?? null,
+                areas_of_guidance: Array.isArray(candidate.areas_of_guidance)
+                  ? candidate.areas_of_guidance
+                  : [],
+                languages_spoken: Array.isArray(candidate.languages_spoken)
+                  ? candidate.languages_spoken
+                  : [],
+                introduction: candidate.introduction ?? null
               } satisfies SuggestedConnectionDto;
             })
             .sort((a, b) => {
@@ -400,22 +478,50 @@ export class ExperienceService {
     return fallback;
   }
 
-  async listTrendingTopics(limit = 10): Promise<TrendingTopicDto[]> {
+  async listTrendingTopics(limit = 10, window?: string): Promise<TrendingTopicDto[]> {
     if (this.client) {
       try {
+        const hours = this.resolveWindowToHours(window);
+        const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
         const { data, error } = await this.client
-          .from('topic_metrics')
-          .select('topic, post_count, velocity_score')
-          .order('velocity_score', { ascending: false })
-          .limit(limit);
+          .from('posts')
+          .select('spiritual_topic, tags, likes_count, created_at')
+          .gte('created_at', since)
+          .limit(1000);
 
         if (!error && data) {
-          const topics = data.map((row: any) => ({
-            topic: row.topic,
-            post_count: row.post_count ?? 0,
-            like_count: 0,
-            velocity_score: row.velocity_score ?? 0
-          } satisfies TrendingTopicDto));
+          const metrics = new Map<string, { postCount: number; likeCount: number; velocityScore: number }>();
+
+          data.forEach((row: any) => {
+            const tags = Array.isArray(row.tags) ? row.tags.filter(Boolean) : [];
+            const topics = [row.spiritual_topic, ...tags].filter((value: string | null | undefined) => Boolean(value)) as string[];
+            if (!topics.length) {
+              return;
+            }
+
+            const createdAt = row.created_at ? new Date(row.created_at) : new Date();
+            const ageHours = Math.max(1, (Date.now() - createdAt.getTime()) / (60 * 60 * 1000));
+
+            topics.forEach((topic) => {
+              const key = topic.toLowerCase();
+              const current = metrics.get(key) ?? { postCount: 0, likeCount: 0, velocityScore: 0 };
+              current.postCount += 1;
+              current.likeCount += row.likes_count ?? 0;
+              current.velocityScore += 1 / ageHours;
+              metrics.set(key, current);
+            });
+          });
+
+          const topics = Array.from(metrics.entries())
+            .map(([topic, value]) => ({
+              topic,
+              post_count: value.postCount,
+              like_count: value.likeCount,
+              velocity_score: Number((value.velocityScore + value.postCount * 0.5 + value.likeCount * 0.1).toFixed(2))
+            }))
+            .sort((a, b) => b.velocity_score - a.velocity_score)
+            .slice(0, limit);
+
           if (topics.length) {
             return topics;
           }
@@ -424,20 +530,53 @@ export class ExperienceService {
         console.warn('[ExperienceService] Failed to load trending topics from Supabase:', error);
       }
     }
-    return this.fallbackTrendingTopics.slice(0, limit);
+    return this.fallbackTrendingTopics
+      .map((topic) => ({
+        ...topic,
+        velocity_score: Number((topic.velocity_score * this.applyWindowWeight(window)).toFixed(2))
+      }))
+      .slice(0, limit);
+  }
+
+  private resolveWindowToHours(window?: string): number {
+    if (!window) return 24;
+    const normalized = window.trim().toLowerCase();
+    if (normalized.endsWith('h')) {
+      const hours = Number(normalized.slice(0, -1));
+      return Number.isFinite(hours) && hours > 0 ? hours : 24;
+    }
+    if (normalized.endsWith('d')) {
+      const days = Number(normalized.slice(0, -1));
+      return Number.isFinite(days) && days > 0 ? days * 24 : 24;
+    }
+    const asNumber = Number(normalized);
+    return Number.isFinite(asNumber) && asNumber > 0 ? asNumber : 24;
+  }
+
+  private applyWindowWeight(window?: string) {
+    const hours = this.resolveWindowToHours(window);
+    if (hours <= 6) return 1.2;
+    if (hours <= 24) return 1;
+    if (hours <= 72) return 0.85;
+    return 0.7;
   }
 
   async getDailyReading(path: string | null | undefined): Promise<DailyReadingDto> {
     if (this.client) {
       try {
         const today = new Date().toISOString().slice(0, 10);
-        const { data, error } = await this.client
+        let query = this.client
           .from('daily_readings')
-          .select('id, title, reference, content, reading_date')
+          .select('id, title, reference, content, reading_date, path, summary')
           .lte('reading_date', today)
           .order('reading_date', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .limit(1);
+
+        if (path) {
+          query = query.eq('path', path.toLowerCase());
+        }
+
+        const { data, error } = await query.maybeSingle();
 
         if (!error && data) {
           const description = typeof data.content === 'string' ? data.content : '';
@@ -446,9 +585,9 @@ export class ExperienceService {
             title: data.reference ? `${data.title} ${data.reference}` : data.title,
             body: description,
             source_url: null,
-            path: path ?? 'general',
+            path: data.path ?? path ?? 'general',
             recommended_at: new Date().toISOString(),
-            summary: description ? `${description.slice(0, 160)}${description.length > 160 ? '…' : ''}` : undefined
+            summary: data.summary ?? (description ? `${description.slice(0, 160)}${description.length > 160 ? '…' : ''}` : undefined)
           } satisfies DailyReadingDto;
         }
       } catch (error) {
@@ -491,7 +630,9 @@ export class ExperienceService {
 
         let query = this.client
           .from('users')
-          .select('id, full_name, spiritual_path, interests, location, bio')
+          .select(
+            'id, full_name, spiritual_path, interests, location, bio, avatar_url, vedic_qualifications, spiritual_qualifications, years_of_experience, areas_of_guidance, languages_spoken, introduction'
+          )
           .range(offset, offset + pageSize - 1)
           .order('created_at', { ascending: false });
 
@@ -506,9 +647,17 @@ export class ExperienceService {
             full_name: row.full_name,
             spiritual_path: row.spiritual_path ?? null,
             interests: Array.isArray(row.interests) ? row.interests : [],
-            avatar_url: null,
+            avatar_url: row.avatar_url ?? null,
             location: row.location ?? null,
-            bio: row.bio ?? null
+            bio: row.bio ?? null,
+            vedic_qualifications: Array.isArray(row.vedic_qualifications) ? row.vedic_qualifications : [],
+            spiritual_qualifications: Array.isArray(row.spiritual_qualifications)
+              ? row.spiritual_qualifications
+              : [],
+            years_of_experience: row.years_of_experience ?? null,
+            areas_of_guidance: Array.isArray(row.areas_of_guidance) ? row.areas_of_guidance : [],
+            languages_spoken: Array.isArray(row.languages_spoken) ? row.languages_spoken : [],
+            introduction: row.introduction ?? null
           } satisfies CommunityMemberDto));
 
           const nextOffset = offset + items.length;

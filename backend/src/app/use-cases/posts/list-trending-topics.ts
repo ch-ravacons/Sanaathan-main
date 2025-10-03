@@ -12,8 +12,8 @@ export interface ListTrendingTopicsOutput {
 export class ListTrendingTopicsUseCase {
   constructor(private readonly experienceService: ExperienceService) {}
 
-  async execute({ limit = 10 }: ListTrendingTopicsInput = {}): Promise<ListTrendingTopicsOutput> {
-    const topics = await this.experienceService.listTrendingTopics(limit);
+  async execute({ limit = 10, window }: ListTrendingTopicsInput = {}): Promise<ListTrendingTopicsOutput> {
+    const topics = await this.experienceService.listTrendingTopics(limit, window);
     return { topics };
   }
 }

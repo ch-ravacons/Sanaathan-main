@@ -113,7 +113,13 @@ const SuggestedConnectionSchema = z.object({
   shared_interests: z.array(z.string()).optional(),
   mutual_followers: z.number().int().optional(),
   avatar_url: z.string().url().nullable().optional(),
-  is_following: z.boolean().optional()
+  is_following: z.boolean().optional(),
+  vedic_qualifications: z.array(z.string()).optional(),
+  spiritual_qualifications: z.array(z.string()).optional(),
+  years_of_experience: z.number().nullable().optional(),
+  areas_of_guidance: z.array(z.string()).optional(),
+  languages_spoken: z.array(z.string()).optional(),
+  introduction: z.string().nullable().optional()
 });
 const SuggestedConnectionsResponseSchema = z.object({
   suggestions: z.array(SuggestedConnectionSchema)
@@ -150,7 +156,13 @@ const CommunityMemberSchema = z.object({
   interests: z.array(z.string()).optional(),
   avatar_url: z.string().url().nullable().optional(),
   location: z.string().nullable().optional(),
-  bio: z.string().nullable().optional()
+  bio: z.string().nullable().optional(),
+  vedic_qualifications: z.array(z.string()).optional(),
+  spiritual_qualifications: z.array(z.string()).optional(),
+  years_of_experience: z.number().nullable().optional(),
+  areas_of_guidance: z.array(z.string()).optional(),
+  languages_spoken: z.array(z.string()).optional(),
+  introduction: z.string().nullable().optional()
 });
 const CommunityResponseSchema = z.object({
   members: z.array(CommunityMemberSchema),
@@ -202,6 +214,34 @@ const DevotionSummarySchema = z.object({
 });
 const DevotionSummaryResponseSchema = z.object({ summary: DevotionSummarySchema });
 
+const UserProfileSchema = z.object({
+  id: z.string(),
+  email: z.string().email(),
+  full_name: z.string(),
+  spiritual_name: z.string().nullable().optional(),
+  spiritual_path: z.string().nullable().optional(),
+  interests: z.array(z.string()).optional(),
+  path_practices: z.array(z.string()).optional(),
+  location: z.string().nullable().optional(),
+  bio: z.string().nullable().optional(),
+  avatar_url: z.string().url().nullable().optional(),
+  vedic_qualifications: z.array(z.string()).optional(),
+  spiritual_qualifications: z.array(z.string()).optional(),
+  years_of_experience: z.number().nullable().optional(),
+  areas_of_guidance: z.array(z.string()).optional(),
+  languages_spoken: z.array(z.string()).optional(),
+  availability: z.string().nullable().optional(),
+  website: z.string().url().nullable().optional(),
+  achievements: z.array(z.string()).optional(),
+  offerings: z.array(z.string()).optional(),
+  certifications: z.array(z.string()).optional(),
+  introduction: z.string().nullable().optional(),
+  whatsapp: z.string().nullable().optional(),
+  linkedin: z.string().nullable().optional(),
+  created_at: z.string(),
+  updated_at: z.string()
+});
+
 const AgentSourceSchema = z.object({ title: z.string(), url: z.string().url(), snippet: z.string().optional() });
 const AgentResponseSchema = z.object({
   message: z.string(),
@@ -226,6 +266,7 @@ export type EventItem = z.infer<typeof EventSchema>;
 export type DevotionPractice = z.infer<typeof DevotionPracticeSchema>;
 export type DevotionSummary = z.infer<typeof DevotionSummarySchema>;
 export type AgentResponse = z.infer<typeof AgentResponseSchema>;
+export type UserProfile = z.infer<typeof UserProfileSchema>;
 
 interface RequestOptions extends RequestInit {
   parseAsJson?: boolean;
@@ -278,12 +319,16 @@ export const queryKeys = {
   trending: (window: string) => ['posts', 'trending', window],
   dailyReading: (path: string | null) => ['readings', path ?? 'all'],
   community: (interest: string | null) => ['community', interest ?? 'all'],
+  communityInfinite: (interest: string | null) => ['community', 'infinite', interest ?? 'all'],
   events: (filters: Record<string, unknown>) => ['events', filters],
   devotion: {
     practices: () => ['devotion', 'practices'],
     summary: (userId?: string | null) => ['devotion', 'summary', userId ?? 'anonymous']
   },
-  agent: (topic: string) => ['agent', topic]
+  agent: (topic: string) => ['agent', topic],
+  users: {
+    profile: (userId: string) => ['users', 'profile', userId]
+  }
 };
 
 export const api = {
@@ -449,6 +494,11 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input)
     });
+  },
+
+  async getUserProfile(userId: string) {
+    const result = await request(`/api/v1/users/${userId}`, z.object({ user: UserProfileSchema.nullable() }));
+    return result.user;
   }
 };
 

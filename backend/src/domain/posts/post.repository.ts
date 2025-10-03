@@ -14,4 +14,8 @@ export interface PostRepository {
   listRecentByUser(userId: string, limit: number): Promise<Post[]>;
   listPublicFeed(limit: number): Promise<Post[]>;
   create(input: CreatePostInput): Promise<Post>;
+  updateModerationStatus(
+    postId: string,
+    status: 'approved' | 'pending' | 'flagged' | 'rejected'
+  ): Promise<void>;
 }

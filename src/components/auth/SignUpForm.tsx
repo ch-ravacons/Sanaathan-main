@@ -35,6 +35,19 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSuccess, isProfileComp
   const [selectedPath, setSelectedPath] = useState('');
   const [selectedPractices, setSelectedPractices] = useState<string[]>([]);
   const [bio, setBio] = useState('');
+  const [vedicQualifications, setVedicQualifications] = useState('');
+  const [spiritualQualifications, setSpiritualQualifications] = useState('');
+  const [areasOfGuidance, setAreasOfGuidance] = useState('');
+  const [languagesSpoken, setLanguagesSpoken] = useState('');
+  const [yearsOfExperience, setYearsOfExperience] = useState('');
+  const [availability, setAvailability] = useState('');
+  const [website, setWebsite] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
+  const [linkedin, setLinkedin] = useState('');
+  const [achievements, setAchievements] = useState('');
+  const [offerings, setOfferings] = useState('');
+  const [certifications, setCertifications] = useState('');
+  const [introduction, setIntroduction] = useState('');
 
   const handleInterestChange = (interestId: string, checked: boolean) => {
     setSelectedInterests((prev) =>
@@ -68,6 +81,18 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSuccess, isProfileComp
     // Step 2 – submit
     setLoading(true);
     try {
+      const commaSeparated = (value: string) =>
+        value
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean);
+      const lines = (value: string) =>
+        value
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean);
+      const experienceYears = yearsOfExperience.trim() ? Number(yearsOfExperience.trim()) : null;
+
       const userData = {
         full_name: fullName,
         spiritual_name: spiritualName || null,
@@ -79,6 +104,19 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSuccess, isProfileComp
         spiritual_path: selectedPath,
         path_practices: selectedPractices,  // ensure column type matches (text[] or jsonb)
         bio: bio || null,
+        vedic_qualifications: commaSeparated(vedicQualifications),
+        spiritual_qualifications: commaSeparated(spiritualQualifications),
+        areas_of_guidance: commaSeparated(areasOfGuidance),
+        languages_spoken: commaSeparated(languagesSpoken),
+        years_of_experience: Number.isFinite(experienceYears) ? experienceYears : null,
+        availability: availability || null,
+        website: website || null,
+        whatsapp: whatsapp || null,
+        linkedin: linkedin || null,
+        achievements: lines(achievements),
+        offerings: lines(offerings),
+        certifications: lines(certifications),
+        introduction: introduction || null
       };
 
       let resultError: any = null;
@@ -337,6 +375,145 @@ export const SignUpForm: React.FC<SignUpFormProps> = ({ onSuccess, isProfileComp
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 placeholder="Tell us about your spiritual journey..."
               />
+            </div>
+
+            <div className="space-y-6 rounded-lg bg-orange-50/60 p-4">
+              <h3 className="text-md font-semibold text-gray-900">Guide & Mentor Details (Optional)</h3>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Vedic Qualifications
+                  <textarea
+                    value={vedicQualifications}
+                    onChange={(e) => setVedicQualifications(e.target.value)}
+                    rows={3}
+                    placeholder="Bhakti Shastri, Vedanta Acharya"
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  />
+                  <span className="mt-1 block text-xs text-gray-500">Comma separated</span>
+                </label>
+                <label className="text-sm font-medium text-gray-700">
+                  Spiritual Qualifications
+                  <textarea
+                    value={spiritualQualifications}
+                    onChange={(e) => setSpiritualQualifications(e.target.value)}
+                    rows={3}
+                    placeholder="Initiated Guru, Meditation Teacher"
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  />
+                  <span className="mt-1 block text-xs text-gray-500">Comma separated</span>
+                </label>
+                <label className="text-sm font-medium text-gray-700">
+                  Areas of Guidance
+                  <textarea
+                    value={areasOfGuidance}
+                    onChange={(e) => setAreasOfGuidance(e.target.value)}
+                    rows={3}
+                    placeholder="Bhakti Coaching, Vedic Counseling"
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  />
+                  <span className="mt-1 block text-xs text-gray-500">Comma separated</span>
+                </label>
+                <label className="text-sm font-medium text-gray-700">
+                  Languages Spoken
+                  <textarea
+                    value={languagesSpoken}
+                    onChange={(e) => setLanguagesSpoken(e.target.value)}
+                    rows={3}
+                    placeholder="English, Hindi, Sanskrit"
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  />
+                  <span className="mt-1 block text-xs text-gray-500">Comma separated</span>
+                </label>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                <label className="text-sm font-medium text-gray-700">
+                  Years of Experience
+                  <input
+                    type="number"
+                    min={0}
+                    value={yearsOfExperience}
+                    onChange={(e) => setYearsOfExperience(e.target.value)}
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  />
+                </label>
+                <label className="text-sm font-medium text-gray-700">
+                  Availability
+                  <input
+                    value={availability}
+                    onChange={(e) => setAvailability(e.target.value)}
+                    placeholder="Weekdays 6–8 PM IST"
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  />
+                </label>
+                <label className="text-sm font-medium text-gray-700">
+                  Website
+                  <input
+                    value={website}
+                    onChange={(e) => setWebsite(e.target.value)}
+                    placeholder="https://your-ashram.org"
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  />
+                </label>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                <label className="text-sm font-medium text-gray-700">
+                  WhatsApp
+                  <input
+                    value={whatsapp}
+                    onChange={(e) => setWhatsapp(e.target.value)}
+                    placeholder="+91 98765 43210"
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  />
+                </label>
+                <label className="text-sm font-medium text-gray-700">
+                  LinkedIn / Public Profile
+                  <input
+                    value={linkedin}
+                    onChange={(e) => setLinkedin(e.target.value)}
+                    placeholder="https://linkedin.com/in/your-profile"
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  />
+                </label>
+                <label className="text-sm font-medium text-gray-700">
+                  Introduction
+                  <textarea
+                    value={introduction}
+                    onChange={(e) => setIntroduction(e.target.value)}
+                    rows={3}
+                    placeholder="Short introduction for seekers"
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  />
+                </label>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                <label className="text-sm font-medium text-gray-700">
+                  Achievements (one per line)
+                  <textarea
+                    value={achievements}
+                    onChange={(e) => setAchievements(e.target.value)}
+                    rows={4}
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  />
+                </label>
+                <label className="text-sm font-medium text-gray-700">
+                  Offerings (one per line)
+                  <textarea
+                    value={offerings}
+                    onChange={(e) => setOfferings(e.target.value)}
+                    rows={4}
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  />
+                </label>
+                <label className="text-sm font-medium text-gray-700">
+                  Certifications (one per line)
+                  <textarea
+                    value={certifications}
+                    onChange={(e) => setCertifications(e.target.value)}
+                    rows={4}
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  />
+                </label>
+              </div>
             </div>
 
             <div className="flex space-x-4">

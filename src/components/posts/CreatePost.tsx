@@ -21,6 +21,14 @@ interface Attachment {
 
 const MAX_ATTACHMENTS = 3;
 
+const readFileAsDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onerror = (event) => reject(event);
+    reader.readAsDataURL(file);
+  });
+
 export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
   const { user, session } = useAuth();
   const { toast } = useToast();
@@ -118,21 +126,29 @@ export const CreatePost: React.FC<CreatePostProps> = ({ onPostCreated }) => {
           fileName: file.name
         });
 
+        if (uploadInfo.uploadUrl.includes('uploads.sanaathan.local')) {
+          const inlineUrl = await readFileAsDataUrl(file);
+          mediaPayload.push({
+            assetId: uploadInfo.assetId,
+            type,
+            metadata: {
+              originalName: file.name,
+              size: file.size,
+              mimeType: file.type,
+              url: inlineUrl,
+              path: uploadInfo.path,
+              inline: true
+            }
+          });
+          continue;
+        }
+
         let uploadResponse: Response;
         const lowerCaseHeaders = Object.fromEntries(
           Object.entries(uploadInfo.headers ?? {}).map(([key, value]) => [key.toLowerCase(), value])
         );
 
-        if (uploadInfo.uploadUrl.includes('uploads.sanaathan.local')) {
-          uploadResponse = await fetch(uploadInfo.uploadUrl, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': file.type,
-              ...uploadInfo.headers
-            },
-            body: file
-          });
-        } else {
+        {
           const headers: Record<string, string> = {};
           Object.entries(lowerCaseHeaders).forEach(([key, value]) => {
             if (key !== 'content-type') {

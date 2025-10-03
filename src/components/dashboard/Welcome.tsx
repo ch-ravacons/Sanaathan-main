@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { interests } from '../../data/interests';
 import { spiritualPaths } from '../../data/spiritualPaths';
@@ -15,6 +15,8 @@ export const Welcome: React.FC = () => {
   ).filter(Boolean) || [];
 
   const userPath = spiritualPaths.find(path => path.id === user.spiritual_path);
+  const [showAllInterests, setShowAllInterests] = useState(false);
+  const displayedInterests = showAllInterests ? userInterests : userInterests.slice(0, 6);
 
   return (
     <Card variant="accent" padding="lg" className="overflow-hidden">
@@ -37,17 +39,48 @@ export const Welcome: React.FC = () => {
             </div>
           )}
 
+          {user.introduction && (
+            <div className="space-y-1">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-brand-500">Guide introduction</h3>
+              <p className="max-w-xl text-sm leading-relaxed text-sand-600">{user.introduction}</p>
+            </div>
+          )}
+
+          {user.areas_of_guidance && user.areas_of_guidance.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-brand-500">Focus areas</h3>
+              <div className="flex flex-wrap gap-2">
+                {user.areas_of_guidance.slice(0, 4).map((area) => (
+                  <Badge key={area} tone="neutral" size="sm">
+                    {area}
+                  </Badge>
+                ))}
+                {user.areas_of_guidance.length > 4 && (
+                  <Badge tone="neutral" size="sm">
+                    +{user.areas_of_guidance.length - 4}
+                  </Badge>
+                )}
+              </div>
+            </div>
+          )}
+
           {userInterests.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-brand-500">Interests</h3>
               <div className="flex flex-wrap gap-2">
-                {userInterests.slice(0, 6).map((interest) => (
+                {displayedInterests.map((interest) => (
                   <Badge key={interest} tone="neutral" size="sm">
                     {interest}
                   </Badge>
                 ))}
                 {userInterests.length > 6 && (
-                  <Badge tone="neutral" size="sm">+{userInterests.length - 6} more</Badge>
+                  <button
+                    type="button"
+                    onClick={() => setShowAllInterests((prev) => !prev)}
+                    className="rounded-full border border-sand-200 bg-white px-2.5 py-0.5 text-xs font-semibold text-sand-600 transition hover:border-brand-200 hover:text-brand-600"
+                  >
+                    {showAllInterests ? 'Show less' : `+${userInterests.length - displayedInterests.length} more`}
+                  </button>
                 )}
               </div>
             </div>

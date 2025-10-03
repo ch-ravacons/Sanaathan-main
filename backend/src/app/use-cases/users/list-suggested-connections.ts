@@ -12,8 +12,8 @@ export interface ListSuggestedConnectionsOutput {
 export class ListSuggestedConnectionsUseCase {
   constructor(private readonly experienceService: ExperienceService) {}
 
-  async execute({ limit = 5 }: ListSuggestedConnectionsInput): Promise<ListSuggestedConnectionsOutput> {
-    const suggestions = await this.experienceService.listSuggestedConnections(limit);
+  async execute({ userId, limit = 5 }: ListSuggestedConnectionsInput): Promise<ListSuggestedConnectionsOutput> {
+    const suggestions = await this.experienceService.listSuggestedConnections(limit, userId);
     return { suggestions };
   }
 }

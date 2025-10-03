@@ -15,6 +15,26 @@ export async function registerAiRoutes(app: FastifyInstance, _opts: FastifyPlugi
     const payload = AskAgentSchema.parse(request.body);
     const usecase = app.container.resolve<AskAgentUseCase>('usecase.ai.askAgent');
     const response = await usecase.execute(payload);
-    return response;
+
+    const sources = (response.citations ?? []).map((citation) => {
+      const title = citation.node.title ?? 'Community insight';
+      const snippet = citation.node.summary ?? undefined;
+      const candidateUrl =
+        typeof citation.node.metadata?.url === 'string' ? citation.node.metadata.url : undefined;
+      const url = candidateUrl && /^https?:\/\//i.test(candidateUrl)
+        ? candidateUrl
+        : `https://sanaathan.community/knowledge/${citation.node.id}`;
+      return {
+        title,
+        url,
+        snippet
+      };
+    });
+
+    return {
+      message: response.output,
+      sources,
+      metadata: response.metadata ?? {}
+    };
   });
 }

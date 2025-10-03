@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BookOpen,
   Users,
@@ -18,9 +18,18 @@ import { Welcome } from './Welcome';
 import { PostFeed } from '../posts/PostFeed';
 import { DevotionTracker } from './DevotionTracker';
 import { GuidancePanel } from './GuidancePanel';
+import { CreateEventForm } from '../events/CreateEventForm';
+import { UserProfileModal } from '../profile/UserProfileModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../ui/Toast';
-import { api, queryKeys, type SuggestedConnection, type TrendingTopic, type EventItem } from '../../lib/api';
+import {
+  api,
+  queryKeys,
+  type SuggestedConnection,
+  type TrendingTopic,
+  type EventItem,
+  type CommunityMember
+} from '../../lib/api';
 import { useUserPreferences } from '../../state/userPreferences';
 import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
@@ -63,10 +72,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     staleTime: 1000 * 60 * 5
   });
 
-  const communityQuery = useQuery({
-    queryKey: queryKeys.community(primaryInterest),
-    queryFn: () => api.getCommunityMembers({ interest: primaryInterest ?? undefined, limit: 5 })
+  const communityQuery = useInfiniteQuery({
+    queryKey: queryKeys.communityInfinite(primaryInterest),
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam }) =>
+      api.getCommunityMembers({
+        interest: primaryInterest ?? undefined,
+        cursor: pageParam ?? undefined,
+        limit: 5
+      }),
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined
   });
+
+  const communityMembers = useMemo(() => {
+    if (!communityQuery.data?.pages) return [] as CommunityMember[];
+    return communityQuery.data.pages.flatMap((page) => page.members ?? []);
+  }, [communityQuery.data]);
+  const communityListLoading = communityQuery.isLoading && !communityQuery.isFetchingNextPage;
 
   const eventFilters = useMemo(
     () => ({
@@ -99,10 +121,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       ? 'Loading daily reading…'
       : dailyReadingQuery.data?.reading?.title ?? 'Explore scripture library';
 
-    const communityDescription = communityQuery.isLoading
+    const communityDescription = communityListLoading
       ? 'Connecting seekers…'
-      : communityQuery.data?.members?.length
-        ? `${communityQuery.data.members.length} seekers${primaryInterest ? ` • ${primaryInterest}` : ''}`
+      : communityMembers.length
+        ? `${communityMembers.length} seekers${primaryInterest ? ` • ${primaryInterest}` : ''}`
         : primaryInterest
           ? `Discover ${primaryInterest} circles`
           : 'Connect with seekers';
@@ -140,6 +162,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
   const trendingTopics: TrendingTopic[] = trendingQuery.data?.topics ?? [];
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
+  const [profileModalUserId, setProfileModalUserId] = useState<string | null>(null);
+  const [showCreateEvent, setShowCreateEvent] = useState(false);
   const suggestedConnections: SuggestedConnection[] = suggestionsQuery.data?.suggestions ?? [];
   const events: EventItem[] = eventsQuery.data?.events ?? [];
   const connectionsToShow = useMemo(
@@ -265,6 +289,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     setSelectedTopic((prev) => (prev === topic ? null : topic));
   };
 
+  const handleDownloadIcs = async (eventId: string, title: string) => {
+    try {
+      const ics = await api.downloadEventIcs(eventId);
+      const blob = new Blob([ics], { type: 'text/calendar' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${title.replace(/\s+/g, '-').toLowerCase()}.ics`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      toast('Calendar file downloaded', 'success');
+    } catch (error: any) {
+      toast(error?.message ?? 'Unable to download ICS file right now.', 'error');
+    }
+  };
+
+  const handleViewProfile = (id: string) => {
+    setProfileModalUserId(id);
+  };
+
   const mobileNavItems: MobileNavItem[] = useMemo(
     () => [
       { label: 'Feed', icon: Home, target: 'dashboard-feed' },
@@ -382,13 +426,35 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                         <div className="min-w-0 space-y-1">
                           <p className="truncate text-sm font-semibold text-sand-900">{displayName}</p>
                           <p className="truncate text-xs text-sand-500">{connection.spiritual_path ?? 'Seeker'}</p>
+                          {connection.years_of_experience != null && (
+                            <p className="text-xs text-sand-500">
+                              {connection.years_of_experience} years guiding
+                            </p>
+                          )}
+                          {connection.areas_of_guidance && connection.areas_of_guidance.length > 0 && (
+                            <p className="truncate text-xs text-sand-500">
+                              Focus • {connection.areas_of_guidance.slice(0, 2).join(', ')}
+                              {connection.areas_of_guidance.length > 2 ? '…' : ''}
+                            </p>
+                          )}
                           {sharedInterest && (
                             <div className="flex flex-wrap gap-1">
                               <Badge tone="neutral" size="sm">#{sharedInterest}</Badge>
                             </div>
                           )}
                         </div>
-                        {renderFollowButton()}
+                        <div className="flex flex-col gap-2">
+                          {renderFollowButton()}
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="text-xs text-sand-500 hover:text-brand-600"
+                            onClick={() => handleViewProfile(connection.id)}
+                          >
+                            View profile
+                          </Button>
+                        </div>
                       </div>
 
                       <div className="pointer-events-none absolute left-1/2 bottom-full z-20 hidden w-64 -translate-x-1/2 -translate-y-3 opacity-0 transition-all duration-200 group-hover:flex group-hover:-translate-y-1 group-hover:opacity-100 group-hover:pointer-events-auto">
@@ -403,7 +469,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                               {sharedInterest && <p className="text-xs text-sand-500">Shared interest: #{sharedInterest}</p>}
                             </div>
                           </div>
-                          <div className="mt-4 flex justify-end">
+                          <div className="mt-4 flex items-center justify-between gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="pointer-events-auto text-xs text-sand-500 hover:text-brand-600"
+                              onClick={() => handleViewProfile(connection.id)}
+                            >
+                              View profile
+                            </Button>
                             <div className="pointer-events-auto">{renderFollowButton('pointer-events-auto')}</div>
                           </div>
                         </div>
@@ -420,7 +495,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                 <p className="text-sm text-sand-600">Explore seekers aligned with your interests.</p>
               </div>
               <div className="space-y-3">
-                {communityQuery.isLoading && (
+                {communityListLoading && (
                   <div className="space-y-2">
                     {[1, 2, 3].map((item) => (
                       <div key={item} className="h-12 animate-pulse rounded-xl bg-sand-100" />
@@ -428,30 +503,83 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                   </div>
                 )}
 
-                {!communityQuery.isLoading && communityQuery.data?.members?.length === 0 && (
+                {!communityListLoading && communityMembers.length === 0 && (
                   <p className="text-sm text-sand-600">No members found for this interest yet.</p>
                 )}
 
-                {communityQuery.data?.members?.slice(0, 5).map((member) => (
+                {communityMembers.map((member) => (
                   <div
                     key={member.id}
-                    className="flex items-center justify-between rounded-xl border border-sand-100 bg-white/75 px-3 py-2.5"
+                    className="flex items-center justify-between gap-3 rounded-xl border border-sand-100 bg-white/75 px-3 py-2.5"
                   >
-                    <div>
-                      <p className="text-sm font-semibold text-sand-900">{member.full_name}</p>
-                      <p className="text-xs text-sand-600">{member.spiritual_path ?? 'Seeker'}</p>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-sand-900">{member.full_name}</p>
+                      <p className="truncate text-xs text-sand-600">{member.spiritual_path ?? 'Seeker'}</p>
+                      {member.areas_of_guidance && member.areas_of_guidance.length > 0 && (
+                        <p className="truncate text-xs text-sand-500">
+                          Focus • {member.areas_of_guidance.slice(0, 2).join(', ')}
+                          {member.areas_of_guidance.length > 2 ? '…' : ''}
+                        </p>
+                      )}
                     </div>
-                    {member.location && <span className="text-xs text-sand-500">{member.location}</span>}
+                    <div className="flex flex-col items-end gap-2">
+                      {member.location && <span className="text-xs text-sand-500">{member.location}</span>}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="px-2 py-1 text-xs text-sand-500 hover:text-brand-600"
+                        onClick={() => handleViewProfile(member.id)}
+                      >
+                        View profile
+                      </Button>
+                    </div>
                   </div>
                 ))}
+
+                {communityQuery.isFetchingNextPage && (
+                  <div className="h-10 animate-pulse rounded-xl bg-sand-100" />
+                )}
+
+                {communityQuery.hasNextPage && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-center"
+                    onClick={() => communityQuery.fetchNextPage()}
+                    disabled={communityQuery.isFetchingNextPage}
+                  >
+                    {communityQuery.isFetchingNextPage ? 'Loading…' : 'Show more seekers'}
+                  </Button>
+                )}
               </div>
             </Card>
 
             <Card padding="md" className="space-y-4" id="dashboard-events">
               <div>
-                <h3 className="text-lg font-semibold text-sand-900">Upcoming Events</h3>
-                <p className="text-sm text-sand-600">Stay connected with spiritual gatherings.</p>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-semibold text-sand-900">Upcoming Events</h3>
+                    <p className="text-sm text-sand-600">Stay connected with spiritual gatherings.</p>
+                  </div>
+                  {user && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={showCreateEvent ? 'ghost' : 'outline'}
+                      onClick={() => setShowCreateEvent((prev) => !prev)}
+                    >
+                      {showCreateEvent ? 'Close' : 'Create Event'}
+                    </Button>
+                  )}
+                </div>
               </div>
+              {showCreateEvent && user && (
+                <div className="rounded-2xl border border-sand-200 bg-sand-50/80 p-4">
+                  <CreateEventForm interestFilter={primaryInterest} />
+                </div>
+              )}
               <div className="space-y-4">
                 {eventsQuery.isLoading && (
                   <div className="space-y-3">
@@ -498,6 +626,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                           onClick={() => handleRsvp(event.id, 'interested')}
                         >
                           Interested
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          disabled={rsvpMutation.isPending}
+                          onClick={() => handleRsvp(event.id, 'not_going')}
+                        >
+                          Not Going
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDownloadIcs(event.id, event.title)}
+                        >
+                          Add to Calendar
                         </Button>
                       </div>
                     </div>
@@ -640,6 +785,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       </main>
 
       <MobileBottomNav items={mobileNavItems} />
+      {profileModalUserId && (
+        <UserProfileModal userId={profileModalUserId} onClose={() => setProfileModalUserId(null)} />
+      )}
     </div>
   );
 };

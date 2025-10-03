@@ -153,4 +153,17 @@ export class SupabasePostRepository implements PostRepository {
 
     return (data ?? []).map(mapRow);
   }
+
+  async updateModerationStatus(
+    postId: string,
+    status: 'approved' | 'pending' | 'flagged' | 'rejected'
+  ): Promise<void> {
+    const { error } = await this.client
+      .from('posts')
+      .update({ moderation_status: status })
+      .eq('id', postId);
+    if (error) {
+      throw new Error(`Failed to update post moderation status: ${error.message}`);
+    }
+  }
 }

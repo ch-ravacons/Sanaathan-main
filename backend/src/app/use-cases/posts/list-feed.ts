@@ -34,9 +34,34 @@ export class ListFeedUseCase {
     publicPosts.forEach((post) => merged.set(post.id, post));
     myPosts.forEach((post) => merged.set(post.id, post));
 
-    const orderedPosts = Array.from(merged.values()).sort(
-      (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
-    );
+    const interestSet = new Set((input.interests ?? []).map((interest) => interest.toLowerCase()));
+    const scored = Array.from(merged.values()).map((post) => {
+      const age = Math.max(1, Date.now() - post.createdAt.getTime());
+      const recencyBoost = 1 / (age / (1000 * 60 * 60) + 1);
+
+      const topic = post.toJSON().spiritualTopic ?? null;
+      const tags = post.tags ?? [];
+      let interestMatches = 0;
+
+      if (topic && interestSet.has(String(topic).toLowerCase())) {
+        interestMatches += 1.5;
+      }
+
+      tags.forEach((tag) => {
+        if (typeof tag === 'string' && interestSet.has(tag.toLowerCase())) {
+          interestMatches += 1;
+        }
+      });
+
+      const engagement = (post.likesCount ?? 0) * 0.1 + (post.commentsCount ?? 0) * 0.2;
+      const score = recencyBoost * 2 + interestMatches + engagement;
+
+      return { post, score };
+    });
+
+    const orderedPosts = scored
+      .sort((a, b) => b.score - a.score)
+      .map((entry) => entry.post);
 
     return {
       posts: orderedPosts,

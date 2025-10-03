@@ -55,6 +55,7 @@ export class CreatePostUseCase {
     });
 
     if (moderation.status !== post.toJSON().moderationStatus) {
+      await this.posts.updateModerationStatus(post.id, moderation.status);
       post = new Post({ ...post.toJSON(), moderationStatus: moderation.status });
     }
 
