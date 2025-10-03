@@ -1,14 +1,31 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Sun, Bell, Search, User, LogOut } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../ui/Button';
+import { useToast } from '../ui/Toast';
 
 interface HeaderProps {
   onProfile?: () => void;
+  onSignOut?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onProfile }) => {
+export const Header: React.FC<HeaderProps> = ({ onProfile, onSignOut }) => {
   const { user, signOut } = useAuth();
+  const { toast } = useToast();
+
+  const handleSignOut = useCallback(async () => {
+    try {
+      await signOut();
+      onSignOut?.();
+      toast('Signed out successfully', 'info');
+      if (typeof window !== 'undefined') {
+        window.location.replace('/');
+      }
+    } catch (error: any) {
+      console.error('Failed to sign out', error);
+      toast(error?.message ?? 'Unable to sign out right now.', 'error');
+    }
+  }, [signOut, onSignOut, toast]);
 
   return (
     <header className="bg-white shadow-md border-b border-orange-100">
@@ -69,9 +86,7 @@ export const Header: React.FC<HeaderProps> = ({ onProfile }) => {
 
             <Button
               variant="ghost"
-              onClick={async () => {
-                await signOut();
-              }}
+              onClick={handleSignOut}
               className="p-2"
             >
               <LogOut className="w-5 h-5" />

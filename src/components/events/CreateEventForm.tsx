@@ -23,9 +23,10 @@ type EventFormValues = z.infer<typeof eventSchema>;
 
 interface CreateEventFormProps {
   interestFilter: string | null;
+  onSuccess?: (eventId: string) => void;
 }
 
-export const CreateEventForm: React.FC<CreateEventFormProps> = ({ interestFilter }) => {
+export const CreateEventForm: React.FC<CreateEventFormProps> = ({ interestFilter, onSuccess }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -83,6 +84,7 @@ export const CreateEventForm: React.FC<CreateEventFormProps> = ({ interestFilter
         userId: user?.id ?? undefined
       };
       queryClient.invalidateQueries({ queryKey: queryKeys.events(filters) });
+      onSuccess?.(result.event.id);
     },
     onError: (error: any) => {
       toast(error?.message ?? 'Unable to create event right now.', 'error');

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BookOpen,
@@ -18,8 +18,10 @@ import { Welcome } from './Welcome';
 import { PostFeed } from '../posts/PostFeed';
 import { DevotionTracker } from './DevotionTracker';
 import { GuidancePanel } from './GuidancePanel';
-import { CreateEventForm } from '../events/CreateEventForm';
+import { CreateEventModal } from '../events/CreateEventModal';
+import { CommunityModal } from '../community/CommunityModal';
 import { UserProfileModal } from '../profile/UserProfileModal';
+import { SuggestedConnectionsModal } from './SuggestedConnectionsModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../ui/Toast';
 import {
@@ -88,6 +90,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     if (!communityQuery.data?.pages) return [] as CommunityMember[];
     return communityQuery.data.pages.flatMap((page) => page.members ?? []);
   }, [communityQuery.data]);
+  const communityPreviewMembers = communityMembers.slice(0, 3);
   const communityListLoading = communityQuery.isLoading && !communityQuery.isFetchingNextPage;
 
   const eventFilters = useMemo(
@@ -163,13 +166,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const trendingTopics: TrendingTopic[] = trendingQuery.data?.topics ?? [];
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [profileModalUserId, setProfileModalUserId] = useState<string | null>(null);
-  const [showCreateEvent, setShowCreateEvent] = useState(false);
+  const [isCreateEventOpen, setIsCreateEventOpen] = useState(false);
+  const [isCommunityModalOpen, setIsCommunityModalOpen] = useState(false);
+  const [isSuggestionsModalOpen, setIsSuggestionsModalOpen] = useState(false);
   const suggestedConnections: SuggestedConnection[] = suggestionsQuery.data?.suggestions ?? [];
   const events: EventItem[] = eventsQuery.data?.events ?? [];
   const connectionsToShow = useMemo(
     () => suggestedConnections.filter((connection) => connection.id !== user?.id),
     [suggestedConnections, user?.id]
   );
+  const suggestedPreview = connectionsToShow.slice(0, 3);
   const devotionSummary = devotionSummaryQuery.data?.summary;
   const devotionMeter = devotionSummary?.meter ?? 0;
   const meterValue = Math.min(Math.max(devotionMeter, 0), 100);
@@ -307,7 +313,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
   const handleViewProfile = (id: string) => {
     setProfileModalUserId(id);
+    setIsCommunityModalOpen(false);
+    setIsSuggestionsModalOpen(false);
   };
+
+  const handleHeaderSignOut = useCallback(() => {
+    setIsCreateEventOpen(false);
+    setIsCommunityModalOpen(false);
+    setIsSuggestionsModalOpen(false);
+    setProfileModalUserId(null);
+    setSelectedTopic(null);
+  }, []);
 
   const mobileNavItems: MobileNavItem[] = useMemo(
     () => [
@@ -321,7 +337,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
   return (
     <div className="min-h-screen bg-sand-50 pb-24 lg:pb-10">
-      <Header onProfile={() => onNavigate('profile')} />
+      <Header onProfile={() => onNavigate('profile')} onSignOut={handleHeaderSignOut} />
 
       <main className="max-w-7xl mx-auto px-4 pt-8 pb-12 sm:px-6 lg:px-8">
         <div className="grid gap-6 lg:gap-8 lg:grid-cols-[280px_minmax(0,1fr)_320px] xl:grid-cols-[300px_minmax(0,1fr)_360px]">
@@ -366,20 +382,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
               </div>
               <div className="space-y-4">
                 {suggestionsQuery.isLoading && (
-                  <div className="space-y-3">
+                  <div className="flex gap-3 overflow-x-auto pb-1">
                     {[1, 2, 3].map((item) => (
-                      <div
-                        key={item}
-                        className="flex items-center justify-between rounded-2xl border border-sand-100 bg-sand-25 p-3 shadow-sm"
-                      >
+                      <div key={item} className="min-w-[220px] rounded-3xl border border-sand-100 bg-sand-25 p-4">
                         <div className="flex items-center gap-3">
                           <div className="h-10 w-10 animate-pulse rounded-full bg-sand-100" />
                           <div className="space-y-2">
-                            <div className="h-3 w-24 rounded bg-sand-100" />
-                            <div className="h-3 w-16 rounded bg-sand-100" />
+                            <div className="h-3 w-20 rounded bg-sand-100" />
+                            <div className="h-3 w-14 rounded bg-sand-100" />
                           </div>
                         </div>
-                        <div className="h-8 w-20 rounded-full bg-sand-100" />
+                        <div className="mt-4 h-3 w-full rounded bg-sand-100" />
+                        <div className="mt-2 h-3 w-1/2 rounded bg-sand-100" />
                       </div>
                     ))}
                   </div>
@@ -397,95 +411,92 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                   <p className="text-sm text-sand-600">No suggestions yet. Check back soon!</p>
                 )}
 
-                {connectionsToShow.map((connection) => {
-                  const isFollowPending =
-                    (followMutation.isPending && followMutation.variables?.followeeId === connection.id) ||
-                    (unfollowMutation.isPending && unfollowMutation.variables?.followeeId === connection.id);
-                  const sharedInterest = connection.shared_interests?.[0];
-                  const displayName = connection.full_name || connection.spiritual_path || 'Spiritual seeker';
+                {suggestedPreview.length > 0 && (
+                  <div className="flex gap-3 overflow-x-auto pb-1">
+                    {suggestedPreview.map((connection) => {
+                      const displayName = connection.full_name || connection.spiritual_path || 'Spiritual seeker';
+                      const sharedInterest = connection.shared_interests?.[0];
+                      const isFollowPending =
+                        (followMutation.isPending && followMutation.variables?.followeeId === connection.id) ||
+                        (unfollowMutation.isPending && unfollowMutation.variables?.followeeId === connection.id);
 
-                  const renderFollowButton = (extraClassName?: string) => (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={connection.is_following ? 'ghost' : 'outline'}
-                      className={`min-w-[84px] justify-center focus-visible:ring-offset-0 ${extraClassName ?? ''}`}
-                      loading={isFollowPending}
-                      onClick={() => handleToggleFollow(connection)}
-                    >
-                      {connection.is_following ? 'Following' : 'Follow'}
-                    </Button>
-                  );
+                      const chips: string[] = [];
+                      if (sharedInterest) chips.push(`#${sharedInterest}`);
+                      (connection.areas_of_guidance ?? []).slice(0, 2).forEach((area) => chips.push(area));
+                      (connection.languages_spoken ?? []).slice(0, 1).forEach((lang) => chips.push(`Speaks ${lang}`));
 
-                  return (
-                    <div key={connection.id} className="group relative">
-                      <div className="grid grid-cols-[auto,1fr,auto] items-center gap-3 rounded-2xl border border-brand-100 bg-white/80 px-3 py-3 shadow-sm">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-500 text-sm font-semibold uppercase text-white">
-                          {displayName.charAt(0)}
-                        </div>
-                        <div className="min-w-0 space-y-1">
-                          <p className="truncate text-sm font-semibold text-sand-900">{displayName}</p>
-                          <p className="truncate text-xs text-sand-500">{connection.spiritual_path ?? 'Seeker'}</p>
-                          {connection.years_of_experience != null && (
-                            <p className="text-xs text-sand-500">
-                              {connection.years_of_experience} years guiding
-                            </p>
-                          )}
-                          {connection.areas_of_guidance && connection.areas_of_guidance.length > 0 && (
-                            <p className="truncate text-xs text-sand-500">
-                              Focus • {connection.areas_of_guidance.slice(0, 2).join(', ')}
-                              {connection.areas_of_guidance.length > 2 ? '…' : ''}
-                            </p>
-                          )}
-                          {sharedInterest && (
-                            <div className="flex flex-wrap gap-1">
-                              <Badge tone="neutral" size="sm">#{sharedInterest}</Badge>
+                      return (
+                        <div
+                          key={connection.id}
+                          className="flex min-w-[220px] max-w-[240px] flex-col justify-between rounded-3xl border border-brand-100/70 bg-white/90 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                        >
+                          <div className="space-y-3">
+                            <div className="flex items-start gap-3">
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-400 via-brand-500 to-brand-600 text-sm font-semibold uppercase text-white">
+                                {displayName.charAt(0)}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-semibold text-sand-900">{displayName}</p>
+                                <p className="truncate text-xs text-sand-500">{connection.spiritual_path ?? 'Seeker'}</p>
+                                {connection.years_of_experience != null && (
+                                  <p className="text-xs text-sand-500">{connection.years_of_experience} yrs guiding</p>
+                                )}
+                              </div>
                             </div>
-                          )}
-                        </div>
-                        <div className="flex flex-col gap-2">
-                          {renderFollowButton()}
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            className="text-xs text-sand-500 hover:text-brand-600"
-                            onClick={() => handleViewProfile(connection.id)}
-                          >
-                            View profile
-                          </Button>
-                        </div>
-                      </div>
 
-                      <div className="pointer-events-none absolute left-1/2 bottom-full z-20 hidden w-64 -translate-x-1/2 -translate-y-3 opacity-0 transition-all duration-200 group-hover:flex group-hover:-translate-y-1 group-hover:opacity-100 group-hover:pointer-events-auto">
-                        <div className="w-full rounded-2xl border border-brand-100 bg-white p-4 text-left shadow-panel">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-500 text-sm font-semibold uppercase text-white">
-                              {displayName.charAt(0)}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-sm font-semibold text-sand-900">{displayName}</p>
-                              <p className="text-xs text-sand-500">{connection.spiritual_path ?? 'Seeker'}</p>
-                              {sharedInterest && <p className="text-xs text-sand-500">Shared interest: #{sharedInterest}</p>}
-                            </div>
+                            {connection.introduction && (
+                              <p className="line-clamp-2 text-xs text-sand-600">{connection.introduction}</p>
+                            )}
+
+                            {chips.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5">
+                                {chips.map((chip) => (
+                                  <Badge key={`${connection.id}-${chip}`} tone="neutral" size="sm">
+                                    {chip}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                          <div className="mt-4 flex items-center justify-between gap-2">
+
+                          <div className="mt-3 flex items-center justify-between gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant={connection.is_following ? 'ghost' : 'outline'}
+                              className="min-w-[86px] justify-center"
+                              loading={isFollowPending}
+                              onClick={() => handleToggleFollow(connection)}
+                            >
+                              {connection.is_following ? 'Following' : 'Follow'}
+                            </Button>
                             <Button
                               type="button"
                               size="sm"
                               variant="ghost"
-                              className="pointer-events-auto text-xs text-sand-500 hover:text-brand-600"
+                              className="text-xs text-brand-600 hover:text-brand-700"
                               onClick={() => handleViewProfile(connection.id)}
                             >
-                              View profile
+                              Profile
                             </Button>
-                            <div className="pointer-events-auto">{renderFollowButton('pointer-events-auto')}</div>
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+
+                    {connectionsToShow.length > 3 && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="min-w-[220px] self-stretch justify-center"
+                        onClick={() => setIsSuggestionsModalOpen(true)}
+                      >
+                        View all ({connectionsToShow.length - 3} more)
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
             </Card>
 
@@ -507,7 +518,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                   <p className="text-sm text-sand-600">No members found for this interest yet.</p>
                 )}
 
-                {communityMembers.map((member) => (
+                {communityMembers.length === 0 && !communityListLoading && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-center"
+                    onClick={() => setIsCommunityModalOpen(true)}
+                  >
+                    Browse wider community
+                  </Button>
+                )}
+
+                {communityPreviewMembers.map((member) => (
                   <div
                     key={member.id}
                     className="flex items-center justify-between gap-3 rounded-xl border border-sand-100 bg-white/75 px-3 py-2.5"
@@ -537,20 +560,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                   </div>
                 ))}
 
-                {communityQuery.isFetchingNextPage && (
-                  <div className="h-10 animate-pulse rounded-xl bg-sand-100" />
-                )}
-
-                {communityQuery.hasNextPage && (
+                {communityMembers.length > 0 && (
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
                     className="w-full justify-center"
-                    onClick={() => communityQuery.fetchNextPage()}
-                    disabled={communityQuery.isFetchingNextPage}
+                    onClick={() => setIsCommunityModalOpen(true)}
                   >
-                    {communityQuery.isFetchingNextPage ? 'Loading…' : 'Show more seekers'}
+                    Explore full community
                   </Button>
                 )}
               </div>
@@ -567,19 +585,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                     <Button
                       type="button"
                       size="sm"
-                      variant={showCreateEvent ? 'ghost' : 'outline'}
-                      onClick={() => setShowCreateEvent((prev) => !prev)}
+                      variant="outline"
+                      onClick={() => setIsCreateEventOpen(true)}
                     >
-                      {showCreateEvent ? 'Close' : 'Create Event'}
+                      Create Event
                     </Button>
                   )}
                 </div>
               </div>
-              {showCreateEvent && user && (
-                <div className="rounded-2xl border border-sand-200 bg-sand-50/80 p-4">
-                  <CreateEventForm interestFilter={primaryInterest} />
-                </div>
-              )}
               <div className="space-y-4">
                 {eventsQuery.isLoading && (
                   <div className="space-y-3">
@@ -785,6 +798,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       </main>
 
       <MobileBottomNav items={mobileNavItems} />
+      {isCreateEventOpen && user && (
+        <CreateEventModal
+          interestFilter={primaryInterest}
+          onClose={() => setIsCreateEventOpen(false)}
+        />
+      )}
+      {isCommunityModalOpen && (
+        <CommunityModal
+          interest={primaryInterest}
+          onClose={() => setIsCommunityModalOpen(false)}
+          onViewProfile={handleViewProfile}
+        />
+      )}
+      {isSuggestionsModalOpen && (
+        <SuggestedConnectionsModal
+          suggestions={connectionsToShow}
+          onClose={() => setIsSuggestionsModalOpen(false)}
+          onViewProfile={handleViewProfile}
+          onToggleFollow={handleToggleFollow}
+          isFollowPending={(id) =>
+            (followMutation.isPending && followMutation.variables?.followeeId === id) ||
+            (unfollowMutation.isPending && unfollowMutation.variables?.followeeId === id)
+          }
+        />
+      )}
       {profileModalUserId && (
         <UserProfileModal userId={profileModalUserId} onClose={() => setProfileModalUserId(null)} />
       )}
